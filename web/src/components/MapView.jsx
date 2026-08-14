@@ -1,0 +1,578 @@
+import { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+const GEOAPIFY_KEY = 'f2c866843de043509aeb5c918773eb41';
+
+const HAZARDS_DATA = [
+  {
+    id: 'PTH-992A',
+    title: '1400 Main St Bridge',
+    lat: 34.0522,
+    lng: -118.2437,
+    severity: 'critical',
+    detectedTime: '10:42 AM Today',
+    coordsText: '34.0522° N, 118.2437° W',
+    confidence: '94.5%',
+    image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-884B',
+    title: 'Grand Ave & 5th St',
+    lat: 34.0545,
+    lng: -118.2520,
+    severity: 'critical',
+    detectedTime: '11:15 AM Today',
+    coordsText: '34.0545° N, 118.2520° W',
+    confidence: '91.2%',
+    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-771C',
+    title: 'Broadway Boulevard #42',
+    lat: 34.0485,
+    lng: -118.2495,
+    severity: 'moderate',
+    detectedTime: '08:30 AM Today',
+    coordsText: '34.0485° N, 118.2495° W',
+    confidence: '86.8%',
+    image: 'https://images.unsplash.com/photo-1578637387939-43c525550085?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-650D',
+    title: 'Wilshire & Hope Intersection',
+    lat: 34.0498,
+    lng: -118.2580,
+    severity: 'moderate',
+    detectedTime: 'Yesterday, 4:20 PM',
+    coordsText: '34.0498° N, 118.2580° W',
+    confidence: '82.0%',
+    image: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-512E',
+    title: 'Sunset Highway Mile 12',
+    lat: 34.0570,
+    lng: -118.2400,
+    severity: 'critical',
+    detectedTime: 'Yesterday, 2:10 PM',
+    coordsText: '34.0570° N, 118.2400° W',
+    confidence: '97.1%',
+    image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-403F',
+    title: 'Olympic Blvd Overpass',
+    lat: 34.0420,
+    lng: -118.2550,
+    severity: 'moderate',
+    detectedTime: '2 Days Ago',
+    coordsText: '34.0420° N, 118.2550° W',
+    confidence: '89.4%',
+    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop',
+  },
+];
+
+export default function MapView({ showToast }) {
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+
+  const [selectedHazard, setSelectedHazard] = useState(HAZARDS_DATA[0]);
+  const [isSheetOpen, setIsSheetOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSeverity, setFilterSeverity] = useState('all');
+  const [geoResults, setGeoResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const criticalCount = HAZARDS_DATA.filter((h) => h.severity === 'critical').length;
+  const moderateCount = HAZARDS_DATA.filter((h) => h.severity === 'moderate').length;
+
+  // Filtered local hazard matches
+  const hazardResults = HAZARDS_DATA.filter((h) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      h.title.toLowerCase().includes(q) ||
+      h.id.toLowerCase().includes(q) ||
+      h.severity.toLowerCase().includes(q)
+    );
+  });
+
+  // Initialize Map
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [34.0515, -118.2480],
+      zoom: 14,
+      zoomControl: false,
+    });
+
+    // Add Geoapify Carto Retina Tile Layer
+    const tileUrl = `https://maps.geoapify.com/v1/tile/carto/{z}/{x}/{y}@2x.png?apiKey=${GEOAPIFY_KEY}`;
+    
+    L.tileLayer(tileUrl, {
+      attribution:
+        'Powered by <a href="https://www.geoapify.com/" target="_blank">Geoapify</a> | &copy; OpenStreetMap',
+      maxZoom: 20,
+    }).addTo(map);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    mapInstanceRef.current = map;
+
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update Markers
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Clear existing markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    const activeList = HAZARDS_DATA.filter((h) => {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch =
+        !q || h.title.toLowerCase().includes(q) || h.id.toLowerCase().includes(q);
+      const matchesSev =
+        filterSeverity === 'all' || h.severity === filterSeverity;
+      return matchesSearch && matchesSev;
+    });
+
+    activeList.forEach((hazard) => {
+      const isCritical = hazard.severity === 'critical';
+      const isSelected = selectedHazard?.id === hazard.id;
+
+      const markerHtml = `
+        <div class="relative flex flex-col items-center cursor-pointer group ${
+          isSelected ? 'scale-125 z-30' : 'z-10'
+        } transition-transform">
+          <div class="absolute -bottom-1 w-6 h-2 rounded-full ${
+            isCritical
+              ? 'bg-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.8)]'
+              : 'bg-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.8)]'
+          } blur-[3px]"></div>
+          <div class="w-9 h-9 rounded-full ${
+            isCritical
+              ? 'bg-[#111827] border-2 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+              : 'bg-[#111827] border-2 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+          } flex items-center justify-center font-bold">
+            <span class="material-symbols-outlined text-base">
+              ${isCritical ? 'warning' : 'report'}
+            </span>
+          </div>
+          <div class="w-1 h-3 ${isCritical ? 'bg-red-500' : 'bg-amber-500'} -mt-1"></div>
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        html: markerHtml,
+        className: 'custom-leaflet-marker',
+        iconSize: [36, 48],
+        iconAnchor: [18, 48],
+      });
+
+      const marker = L.marker([hazard.lat, hazard.lng], { icon: customIcon }).addTo(map);
+
+      marker.on('click', () => {
+        setSelectedHazard(hazard);
+        setIsSheetOpen(true);
+        map.flyTo([hazard.lat, hazard.lng], 16, { duration: 0.8 });
+      });
+
+      markersRef.current.push(marker);
+    });
+  }, [searchQuery, filterSeverity, selectedHazard]);
+
+  // Geoapify Geocoding API Search
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setGeoResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(
+          `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+            q
+          )}&apiKey=${GEOAPIFY_KEY}`
+        );
+        if (!response.ok) throw new Error('Geocoding error');
+        const data = await response.json();
+        if (data.features) {
+          const results = data.features.slice(0, 4).map((f) => ({
+            name: f.properties.formatted,
+            lat: f.geometry.coordinates[1],
+            lng: f.geometry.coordinates[0],
+          }));
+          setGeoResults(results);
+        }
+      } catch (err) {
+        console.error('Geoapify search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSelectHazard = (hazard) => {
+    setSelectedHazard(hazard);
+    setIsSheetOpen(true);
+    setShowDropdown(false);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([hazard.lat, hazard.lng], 16, { duration: 1 });
+    }
+    if (showToast) showToast(`Focused on ${hazard.title}`, 'info');
+  };
+
+  const handleSelectGeoPlace = (place) => {
+    setShowDropdown(false);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([place.lat, place.lng], 14, { duration: 1 });
+    }
+    if (showToast) showToast(`Moved map to ${place.name}`, 'info');
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (hazardResults.length > 0) {
+      handleSelectHazard(hazardResults[0]);
+    } else if (geoResults.length > 0) {
+      handleSelectGeoPlace(geoResults[0]);
+    } else {
+      if (showToast) showToast('No matching location found', 'error');
+    }
+  };
+
+  const handleRecentering = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([34.0515, -118.2480], 14, { duration: 1 });
+      if (showToast) showToast('Map recentered to Downtown LA', 'info');
+    }
+  };
+
+  const handleNavigateMap = (hazard) => {
+    if (!hazard) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${hazard.lat},${hazard.lng}`;
+    window.open(url, '_blank');
+    if (showToast) showToast(`Opening directions to ${hazard.title}...`, 'info');
+  };
+
+  const handleReportIssue = (hazard) => {
+    if (showToast) {
+      showToast(`Hazard report dispatched for ${hazard.id}!`, 'success');
+    }
+  };
+
+  return (
+    <main className="flex-1 relative w-full h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-[#0a0e17]">
+      {/* Search & HUD Controls Bar */}
+      <div className="absolute top-4 left-4 right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-start gap-3">
+        {/* Search Container with Autocomplete Dropdown */}
+        <div className="pointer-events-auto relative w-full max-w-md">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="bg-[#111827]/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-2xl hover:border-amber-500/40 transition-colors"
+          >
+            <span className="material-symbols-outlined text-slate-400">search</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onFocus={() => setShowDropdown(true)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowDropdown(true);
+              }}
+              placeholder="Search location, street, or hazard ID..."
+              className="bg-transparent border-none text-slate-100 placeholder-slate-500 text-sm focus:outline-none w-full"
+            />
+            {isSearching && (
+              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            )}
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setGeoResults([]);
+                  setShowDropdown(false);
+                }}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            )}
+          </form>
+
+          {/* Autocomplete Suggestions Panel */}
+          {showDropdown && searchQuery.trim().length > 0 && (
+            <div
+              className="absolute top-full left-0 right-0 mt-2 bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 max-h-80 overflow-y-auto space-y-1 animate-in fade-in"
+              onMouseLeave={() => setShowDropdown(false)}
+            >
+              {/* Local Hazard Matches Section */}
+              {hazardResults.length > 0 && (
+                <div>
+                  <div className="px-3 py-1 text-[10px] font-mono text-amber-400 uppercase tracking-wider">
+                    Pothole Hazards ({hazardResults.length})
+                  </div>
+                  {hazardResults.map((hazard) => (
+                    <button
+                      key={hazard.id}
+                      onClick={() => handleSelectHazard(hazard)}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center justify-between transition-colors group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <span
+                          className={`material-symbols-outlined text-base ${
+                            hazard.severity === 'critical' ? 'text-red-400' : 'text-amber-400'
+                          }`}
+                        >
+                          {hazard.severity === 'critical' ? 'warning' : 'report'}
+                        </span>
+                        <div className="truncate">
+                          <p className="text-xs font-semibold text-slate-100 group-hover:text-amber-400 truncate">
+                            {hazard.title}
+                          </p>
+                          <p className="text-[10px] font-mono text-slate-400">
+                            ID: {hazard.id} • {hazard.coordsText}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
+                          hazard.severity === 'critical'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        }`}
+                      >
+                        {hazard.severity}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Global Geoapify Places Section */}
+              {geoResults.length > 0 && (
+                <div className="pt-1 border-t border-slate-800">
+                  <div className="px-3 py-1 text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
+                    Global Locations (Geoapify)
+                  </div>
+                  {geoResults.map((place, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSelectGeoPlace(place)}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center gap-2 text-slate-300 hover:text-cyan-400 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm text-cyan-400">location_on</span>
+                      <span className="text-xs truncate">{place.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {hazardResults.length === 0 && geoResults.length === 0 && !isSearching && (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  No matching hazards or locations found.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* HUD Hazard Filter Controls */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <div className="bg-[#111827]/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1.5 flex items-center gap-1 shadow-2xl">
+            <button
+              onClick={() => setFilterSeverity('all')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors ${
+                filterSeverity === 'all'
+                  ? 'bg-amber-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              All ({HAZARDS_DATA.length})
+            </button>
+            <button
+              onClick={() => setFilterSeverity('critical')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 ${
+                filterSeverity === 'critical'
+                  ? 'bg-red-500 text-slate-100 shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+                  : 'text-slate-400 hover:text-red-400'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              Critical ({criticalCount})
+            </button>
+            <button
+              onClick={() => setFilterSeverity('moderate')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 ${
+                filterSeverity === 'moderate'
+                  ? 'bg-amber-500 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                  : 'text-slate-400 hover:text-amber-400'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              Moderate ({moderateCount})
+            </button>
+          </div>
+
+          <button
+            onClick={handleRecentering}
+            className="w-10 h-10 bg-[#111827]/90 backdrop-blur-md border border-slate-700/80 rounded-2xl flex items-center justify-center text-slate-300 hover:text-amber-400 hover:border-amber-500/40 shadow-2xl transition-all"
+            title="Recenter Map"
+          >
+            <span className="material-symbols-outlined text-xl">my_location</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Map Container */}
+      <div ref={mapContainerRef} className="w-full h-full min-h-[500px] z-10" />
+
+      {/* Details Bottom Sheet */}
+      {selectedHazard && (
+        <div
+          className={`absolute bottom-0 left-0 right-0 z-[500] bg-[#111827]/95 backdrop-blur-xl border-t border-slate-800 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
+            isSheetOpen ? 'translate-y-0' : 'translate-y-[calc(100%-44px)]'
+          }`}
+        >
+          {/* Sheet Handle */}
+          <div
+            onClick={() => setIsSheetOpen(!isSheetOpen)}
+            className="w-full flex flex-col items-center pt-3 pb-2 cursor-pointer group"
+          >
+            <div className="w-12 h-1.5 bg-slate-700 group-hover:bg-amber-400 rounded-full transition-colors" />
+          </div>
+
+          <div className="px-5 pb-6 pt-1 max-w-3xl mx-auto space-y-4">
+            {/* Header & Close */}
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      selectedHazard.severity === 'critical'
+                        ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                        : 'bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                    }`}
+                  >
+                    {selectedHazard.severity} Severity
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">ID: {selectedHazard.id}</span>
+                </div>
+                <h2 className="font-heading text-xl font-bold text-slate-100">
+                  {selectedHazard.title}
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsSheetOpen(false)}
+                className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Content Layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Photo Card */}
+              <div className="col-span-1 rounded-xl border border-slate-800 overflow-hidden relative aspect-video sm:aspect-square bg-slate-900 group">
+                <img
+                  src={selectedHazard.image}
+                  alt={selectedHazard.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 border-2 border-amber-500/40 rounded-xl pointer-events-none" />
+                <div className="absolute top-2 right-2 bg-slate-950/80 backdrop-blur-md rounded px-2 py-0.5 text-[10px] font-mono text-cyan-400 flex items-center gap-1 border border-cyan-500/30">
+                  <span className="material-symbols-outlined text-[12px]">center_focus_strong</span>
+                  AI CONF {selectedHazard.confidence}
+                </div>
+              </div>
+
+              {/* Details Meta Grid */}
+              <div className="col-span-2 grid grid-cols-2 gap-2">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-center">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                    GPS Coordinates
+                  </span>
+                  <span className="text-xs font-mono font-bold text-cyan-400 truncate">
+                    {selectedHazard.coordsText}
+                  </span>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-center">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                    Detected Timestamp
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-200 truncate">
+                    {selectedHazard.detectedTime}
+                  </span>
+                </div>
+
+                <div className="col-span-2 bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-base">engineering</span>
+                    <span className="text-xs text-slate-300 font-medium">Status: Maintenance Scheduled</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    High Priority
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions Area */}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => handleNavigateMap(selectedHazard)}
+                className="flex-1 bg-slate-900 border border-slate-700/80 hover:border-amber-500/40 rounded-xl py-3 flex items-center justify-center gap-2 text-slate-200 font-semibold text-sm hover:bg-slate-800 transition-all active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-lg">directions</span>
+                Navigate
+              </button>
+
+              <button
+                onClick={() => handleReportIssue(selectedHazard)}
+                className="flex-1 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm py-3 rounded-xl shadow-[0_4px_20px_rgba(245,158,11,0.35)] hover:shadow-[0_6px_28px_rgba(245,158,11,0.5)] transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  assignment
+                </span>
+                Report Issue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

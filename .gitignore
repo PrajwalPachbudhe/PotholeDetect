@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Production build outputs
+dist/
+web/dist/
+build/
+
+# Large model weights (>100MB Git limit)
+y8best.pt
+*.mp4
+*.avi
+
+# Environment & OS files
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.log

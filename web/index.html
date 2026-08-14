@@ -1,0 +1,89 @@
+<!doctype html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>PotholeDetect - AI Road Hazard System</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#f59e0b",
+              "primary-container": "#fdb813",
+              "on-primary": "#0f172a",
+              "on-primary-container": "#0f172a",
+              secondary: "#94a3b8",
+              background: "#0a0e17",
+              "on-background": "#f8fafc",
+              "on-surface": "#f8fafc",
+              "on-surface-variant": "#94a3b8",
+              "surface-card": "#111827",
+              "surface-container": "#111827",
+              "surface-container-highest": "#1f2937",
+              "asphalt-gray": "#1e293b",
+              "ai-cyan": "#06b6d4",
+              "warning-amber": "#f59e0b",
+              "danger-orange": "#ef4444",
+              error: "#ef4444",
+              "error-container": "#7f1d1d",
+            },
+            fontFamily: {
+              heading: ["Space Grotesk", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+              "headline-lg": ["Space Grotesk", "sans-serif"],
+              "headline-lg-mobile": ["Space Grotesk", "sans-serif"],
+              "body-md": ["Inter", "sans-serif"],
+              "label-mono": ["JetBrains Mono", "monospace"],
+              "data-metric": ["JetBrains Mono", "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background-color: #0a0e17; color: #f8fafc; font-family: 'Inter', sans-serif; }
+      .scan-line {
+        position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+        background: linear-gradient(to right, transparent, rgba(245, 158, 11, 0.9), transparent);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+        animation: scan 2.5s infinite linear; z-index: 10;
+      }
+      @keyframes scan {
+        0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; }
+      }
+      .ai-scan-line {
+        position: absolute; width: 100%; height: 2px;
+        background: linear-gradient(to right, transparent, #f59e0b, transparent);
+        animation: scan 2s linear infinite;
+      }
+      .hud-overlay { background: radial-gradient(circle at center, transparent 40%, rgba(10, 14, 23, 0.6) 100%); }
+      .glass-panel { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+      .upload-zone { transition: all 0.3s ease; }
+      .upload-zone.dragging { border-color: #f59e0b !important; background: rgba(245, 158, 11, 0.05) !important; }
+      .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+      .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+      .fade-in { animation: fadeIn 0.4s ease-out; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      .slide-up { animation: slideUp 0.4s ease-out; }
+      @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes bounceIn {
+        0% { opacity: 0; transform: scale(0.9) translateY(-10px); }
+        70% { transform: scale(1.02) translateY(2px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .animate-bounce-in { animation: bounceIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
+  </head>
+  <body class="antialiased min-h-screen flex flex-col font-body">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
