@@ -58,8 +58,8 @@ export default function ScanView() {
         const formData = new FormData();
         formData.append('image', blob);
         
-        // Use the localtunnel API URL
-        const API_URL = 'https://plain-emus-happen.loca.lt';
+        // Use the persistent localtunnel API URL
+        const API_URL = 'https://prajwal-pothole-detect-999.loca.lt';
         
         const response = await fetch(`${API_URL}/api/stream_detect`, {
           method: 'POST',
