@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Load model once on startup
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "y8best.pt")
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "best.pt")
 model = YOLO(MODEL_PATH)
 
 @app.route("/api/detect", methods=["POST"])
