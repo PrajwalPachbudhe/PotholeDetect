@@ -111,6 +111,10 @@ def stream_detect():
 
 
 
+@app.route("/", methods=["GET", "HEAD"])
+def index():
+    return "Pothole Detection API is running!", 200
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "model": MODEL_PATH})
