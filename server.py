@@ -120,5 +120,6 @@ def health():
     return jsonify({"status": "ok", "model": MODEL_PATH})
 
 if __name__ == "__main__":
-    print("🚀 Pothole Detection API starting on http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Pothole Detection API starting on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
