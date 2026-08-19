@@ -58,11 +58,14 @@ export default function ScanView() {
         const formData = new FormData();
         formData.append('image', blob);
         
-        // Use the deployed backend API URL directly
-        const API_URL = 'https://pothole-backend-mz4l.onrender.com';
+        // Use the localtunnel API URL
+        const API_URL = 'https://plain-emus-happen.loca.lt';
         
         const response = await fetch(`${API_URL}/api/stream_detect`, {
           method: 'POST',
+          headers: {
+            'Bypass-Tunnel-Reminder': 'true',
+          },
           body: formData
         });
         
