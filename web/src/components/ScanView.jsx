@@ -58,8 +58,8 @@ export default function ScanView() {
         const formData = new FormData();
         formData.append('image', blob);
         
-        // Use environment variable for deployed API URL, or fallback to localhost
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        // Use the deployed backend API URL directly
+        const API_URL = 'https://pothole-backend-mz4l.onrender.com';
         
         const response = await fetch(`${API_URL}/api/stream_detect`, {
           method: 'POST',
