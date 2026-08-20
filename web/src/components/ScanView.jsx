@@ -59,7 +59,7 @@ export default function ScanView() {
         formData.append('image', blob);
         
         // Use the persistent localtunnel API URL
-        const API_URL = 'https://gold-ends-study.loca.lt';
+        const API_URL = 'https://8ba7e67c6c1ab7.lhr.life';
         
         const response = await fetch(`${API_URL}/api/stream_detect`, {
           method: 'POST',
