@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Load model once on startup
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "best.pt")
+MODEL_PATH = "runs/detect/train-3/weights/best.pt"
 model = YOLO(MODEL_PATH)
 
 @app.route("/api/detect", methods=["POST"])
@@ -40,7 +40,7 @@ def detect():
             conf = float(box.conf[0])
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             detections.append({
-                "class": result.names[cls_id],
+                "name": result.names[cls_id],
                 "confidence": round(conf * 100, 1),
                 "bbox": {
                     "x1": round(x1),
@@ -99,7 +99,7 @@ def stream_detect():
                 conf = float(box.conf[0])
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 detections.append({
-                    "class": result.names[cls_id],
+                    "name": result.names[cls_id],
                     "confidence": conf,
                     "x1": x1,
                     "y1": y1,
