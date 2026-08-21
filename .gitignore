@@ -1,11 +1,18 @@
-# Dependencies
+# Dependencies & Virtualenvs
 node_modules/
 web/node_modules/
+.venv/
+env/
+venv/
 
 # Production build outputs
 dist/
 web/dist/
 build/
+
+# Dataset archives & unpacked images
+pothole.v17i.yolov8/
+pothole_dataset.zip
 
 # Large model weights (>100MB Git limit)
 y8best.pt
@@ -18,3 +25,5 @@ y8best.pt
 .DS_Store
 Thumbs.db
 *.log
+__pycache__/
+*.pyc
