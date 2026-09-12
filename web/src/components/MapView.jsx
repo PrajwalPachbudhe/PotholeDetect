@@ -4,25 +4,25 @@ import 'leaflet/dist/leaflet.css';
 
 // Tile provider URLs
 const TILE_LAYERS = {
-  dark: {
-    name: 'Carto Dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    subdomains: 'abcd',
-    attribution: '&copy; CARTO &copy; OpenStreetMap',
-    maxZoom: 20,
-  },
   satellite: {
-    name: 'Satellite Hybrid',
+    name: 'Satellite',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     subdomains: 'abc',
-    attribution: '&copy; Esri &mdash; Earthstar Geographics',
+    attribution: '&copy; Esri Earthstar',
     maxZoom: 19,
   },
   street: {
-    name: 'Street Map',
+    name: 'Street',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     subdomains: 'abc',
     attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+  },
+  dark: {
+    name: 'Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    subdomains: 'abcd',
+    attribution: '&copy; OpenStreetMap',
     maxZoom: 19,
   },
 };
@@ -47,10 +47,10 @@ export default function MapView({
   const gpsPathPolylineRef = useRef(null);
 
   const [selectedHazard, setSelectedHazard] = useState(null);
-  const [isSheetOpen, setIsSheetOpen] = useState(true);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('all');
-  const [mapStyle, setMapStyle] = useState('dark');
+  const [mapStyle, setMapStyle] = useState('satellite');
   const [showTrafficLayer, setShowTrafficLayer] = useState(true);
   const [showMarkers, setShowMarkers] = useState(true);
   const [followVehicle, setFollowVehicle] = useState(true);
@@ -390,19 +390,19 @@ export default function MapView({
   };
 
   return (
-    <main className="flex-1 relative w-full h-[calc(100dvh-64px-65px)] md:h-[calc(100vh-64px)] min-h-[400px] flex flex-col overflow-hidden bg-[#0a0e17]">
-      {/* Top HUD Controls & Search Bar */}
-      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-start gap-2 md:gap-3">
-        {/* Search Input Container */}
-        <div className="pointer-events-auto relative w-full max-w-md">
+    <main className="flex-1 relative w-full h-[calc(100dvh-64px-65px)] md:h-[calc(100vh-64px)] min-h-[420px] flex flex-col overflow-hidden bg-[#0a0e17]">
+      {/* Top Floating Header & Controls Container */}
+      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-stretch md:items-start gap-2">
+        {/* Search Input */}
+        <div className="pointer-events-auto relative w-full md:max-w-xs lg:max-w-sm flex-shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               if (activeHazardsList.length > 0) handleSelectHazard(activeHazardsList[0]);
             }}
-            className="bg-[#111827]/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-2xl hover:border-amber-500/40 transition-colors"
+            className="bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-3.5 py-2 flex items-center gap-2.5 shadow-2xl hover:border-amber-500/40 transition-colors"
           >
-            <span className="material-symbols-outlined text-slate-400">search</span>
+            <span className="material-symbols-outlined text-slate-400 text-lg">search</span>
             <input
               type="text"
               value={searchQuery}
@@ -411,11 +411,11 @@ export default function MapView({
                 setSearchQuery(e.target.value);
                 setShowDropdown(true);
               }}
-              placeholder="Search road, street, or hazard ID..."
-              className="bg-transparent border-none text-slate-100 placeholder-slate-500 text-sm focus:outline-none w-full"
+              placeholder="Search road or defect ID..."
+              className="bg-transparent border-none text-slate-100 placeholder-slate-500 text-xs focus:outline-none w-full"
             />
             {isSearching && (
-              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              <div className="w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
             )}
             {searchQuery && (
               <button
@@ -435,23 +435,23 @@ export default function MapView({
           {/* Autocomplete Suggestions */}
           {showDropdown && searchQuery.trim().length > 0 && (
             <div
-              className="absolute top-full left-0 right-0 mt-2 bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 max-h-80 overflow-y-auto space-y-1"
+              className="absolute top-full left-0 right-0 mt-1.5 bg-[#111827]/95 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 max-h-64 overflow-y-auto space-y-1"
               onMouseLeave={() => setShowDropdown(false)}
             >
               {activeHazardsList.length > 0 && (
                 <div>
-                  <div className="px-3 py-1 text-[10px] font-mono text-amber-400 uppercase tracking-wider">
+                  <div className="px-2.5 py-1 text-[10px] font-mono text-amber-400 uppercase tracking-wider">
                     Pothole Hazards ({activeHazardsList.length})
                   </div>
                   {activeHazardsList.slice(0, 4).map((hazard) => (
                     <button
                       key={hazard.id}
                       onClick={() => handleSelectHazard(hazard)}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center justify-between transition-colors group"
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-800/80 flex items-center justify-between transition-colors group"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
                         <span
-                          className={`material-symbols-outlined text-base ${
+                          className={`material-symbols-outlined text-sm ${
                             hazard.severity === 'critical' ? 'text-red-400' : 'text-amber-400'
                           }`}
                         >
@@ -467,7 +467,7 @@ export default function MapView({
                         </div>
                       </div>
                       <span
-                        className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
+                        className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
                           hazard.severity === 'critical'
                             ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                             : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -482,14 +482,14 @@ export default function MapView({
 
               {geoResults.length > 0 && (
                 <div className="pt-1 border-t border-slate-800">
-                  <div className="px-3 py-1 text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
+                  <div className="px-2.5 py-1 text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
                     Global Locations
                   </div>
                   {geoResults.map((place, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSelectGeoPlace(place)}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center gap-2 text-slate-300 hover:text-cyan-400 transition-colors"
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-800/80 flex items-center gap-2 text-slate-300 hover:text-cyan-400 transition-colors"
                     >
                       <span className="material-symbols-outlined text-sm text-cyan-400">location_on</span>
                       <span className="text-xs truncate">{place.name}</span>
@@ -501,9 +501,29 @@ export default function MapView({
           )}
         </div>
 
-        {/* Right Controls: Traffic Layer, Map Styles, GPS Controls */}
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2">
-          {/* Road Defect Indicator Toggle */}
+        {/* Action Pills Bar (Horizontal scroll on mobile, flex on desktop) */}
+        <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+          {/* Map Layer Switcher */}
+          <div className="bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-xl p-0.5 flex items-center gap-0.5 shadow-xl flex-shrink-0">
+            {Object.keys(TILE_LAYERS).map((styleKey) => (
+              <button
+                key={styleKey}
+                onClick={() => setMapStyle(styleKey)}
+                className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold capitalize transition-colors flex items-center gap-1 ${
+                  mapStyle === styleKey
+                    ? 'bg-amber-500 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {styleKey === 'satellite' && <span>🛰️</span>}
+                {styleKey === 'street' && <span>🛣️</span>}
+                {styleKey === 'dark' && <span>🌙</span>}
+                <span>{styleKey}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Road Defect Hotspots Toggle */}
           <button
             onClick={() => {
               setShowTrafficLayer(!showTrafficLayer);
@@ -512,252 +532,209 @@ export default function MapView({
                 'info'
               );
             }}
-            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 backdrop-blur-md shadow-2xl ${
+            className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold border transition-all flex items-center gap-1 backdrop-blur-xl shadow-xl flex-shrink-0 ${
               showTrafficLayer
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-emerald-500/20'
-                : 'bg-[#111827]/90 text-slate-400 border-slate-700/80 hover:text-slate-200'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : 'bg-[#111827]/95 text-slate-400 border-slate-700/80'
             }`}
           >
-            <span className="material-symbols-outlined text-base">traffic</span>
-            <span>Road Hotspots</span>
-            {showTrafficLayer && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
+            <span className="material-symbols-outlined text-sm">traffic</span>
+            <span>Hotspots</span>
+            {showTrafficLayer && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
           </button>
 
-          {/* Map Layer Switcher */}
-          <div className="bg-[#111827]/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 flex items-center gap-1 shadow-2xl">
-            {Object.keys(TILE_LAYERS).map((styleKey) => (
-              <button
-                key={styleKey}
-                onClick={() => setMapStyle(styleKey)}
-                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold capitalize transition-colors ${
-                  mapStyle === styleKey
-                    ? 'bg-amber-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {styleKey}
-              </button>
-            ))}
-          </div>
+          {/* GPS Simulation Toggle */}
+          <button
+            onClick={() => {
+              if (isSimulating) {
+                onToggleSimulation?.();
+                showToast?.('Drive simulation stopped', 'info');
+              } else {
+                onToggleSimulation?.();
+                showToast?.('🚗 Drive Route simulation active', 'success');
+              }
+            }}
+            className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1 transition-all border backdrop-blur-xl shadow-xl flex-shrink-0 ${
+              isSimulating
+                ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_12px_rgba(37,99,235,0.6)] animate-pulse'
+                : 'bg-[#111827]/95 text-slate-300 border-slate-700/80 hover:text-blue-400'
+            }`}
+          >
+            <span className="material-symbols-outlined text-xs">directions_car</span>
+            <span>{isSimulating ? 'Sim On' : 'Simulate'}</span>
+          </button>
 
-          {/* GPS Simulation / Live GPS Tracker */}
-          <div className="bg-[#111827]/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 flex items-center gap-1 shadow-2xl">
-            <button
-              onClick={() => {
-                if (isSimulating) {
-                  onToggleSimulation?.();
-                  showToast?.('Drive simulation stopped', 'info');
-                } else {
-                  onToggleSimulation?.();
-                  showToast?.('🚗 Live Drive Route simulation active', 'success');
-                }
-              }}
-              className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                isSimulating
-                  ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.6)] animate-pulse'
-                  : 'text-slate-300 hover:text-blue-400'
-              }`}
-              title="Simulate driving car along road route"
-            >
-              <span className="material-symbols-outlined text-sm">directions_car</span>
-              {isSimulating ? 'Simulating' : 'Simulate'}
-            </button>
-
-            <button
-              onClick={() => {
-                if (isGpsTracking && !isSimulating) {
-                  onStopGps?.();
-                  showToast?.('GPS tracking paused', 'info');
-                } else {
-                  onStartGps?.();
-                  showToast?.('Live GPS tracking started', 'success');
-                }
-              }}
-              className={`p-1.5 rounded-xl text-xs font-bold transition-all ${
-                isGpsTracking && !isSimulating
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Toggle Live Device GPS"
-            >
-              <span className="material-symbols-outlined text-base">gps_fixed</span>
-            </button>
-          </div>
+          {/* Live Device GPS Toggle */}
+          <button
+            onClick={() => {
+              if (isGpsTracking && !isSimulating) {
+                onStopGps?.();
+                showToast?.('GPS tracking paused', 'info');
+              } else {
+                onStartGps?.();
+                showToast?.('Live GPS tracking started', 'success');
+              }
+            }}
+            className={`p-1.5 rounded-xl text-xs font-bold transition-all border backdrop-blur-xl shadow-xl flex-shrink-0 ${
+              isGpsTracking && !isSimulating
+                ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                : 'bg-[#111827]/95 text-slate-400 border-slate-700/80 hover:text-slate-200'
+            }`}
+            title="Toggle Live Device GPS"
+          >
+            <span className="material-symbols-outlined text-sm">gps_fixed</span>
+          </button>
 
           {/* Recenter Button */}
           <button
             onClick={handleRecenter}
-            className={`w-10 h-10 bg-[#111827]/90 backdrop-blur-md border rounded-2xl flex items-center justify-center shadow-2xl transition-all ${
+            className={`p-1.5 rounded-xl border backdrop-blur-xl shadow-xl flex items-center justify-center transition-all flex-shrink-0 ${
               followVehicle
-                ? 'border-blue-500 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.3)]'
-                : 'border-slate-700/80 text-slate-300 hover:text-amber-400'
+                ? 'bg-[#111827]/95 border-blue-500 text-blue-400'
+                : 'bg-[#111827]/95 border-slate-700/80 text-slate-300 hover:text-amber-400'
             }`}
             title="Recenter Map"
           >
-            <span className="material-symbols-outlined text-xl">my_location</span>
+            <span className="material-symbols-outlined text-sm">my_location</span>
           </button>
         </div>
       </div>
 
-      {/* Floating Speedometer & Live Telemetry HUD */}
+      {/* Floating Speedometer & Live Telemetry Badge (Positioned below top pills) */}
       {currentGps && (
-        <div className="absolute top-20 left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-3 shadow-2xl flex items-center gap-4 max-w-sm animate-in fade-in">
-          <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/40 flex flex-col items-center justify-center text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-            <span className="text-base font-extrabold font-heading leading-none">
+        <div className="absolute top-[88px] md:top-20 left-2 md:left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-700/80 rounded-xl p-2 md:p-3 shadow-2xl flex items-center gap-2.5 max-w-[280px] md:max-w-sm animate-in fade-in">
+          <div className="w-9 h-9 md:w-11 md:h-11 rounded-lg bg-blue-500/15 border border-blue-500/40 flex flex-col items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] flex-shrink-0">
+            <span className="text-xs md:text-sm font-extrabold font-heading leading-none">
               {currentGps.speed || 0}
             </span>
-            <span className="text-[8px] font-mono uppercase tracking-wider text-slate-400">km/h</span>
+            <span className="text-[7px] font-mono uppercase text-slate-400">km/h</span>
           </div>
 
           <div className="flex flex-col min-w-0 pr-1">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
-                GPS LIVE TELEMETRY
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+              <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider truncate">
+                LIVE GPS
               </span>
             </div>
-            <p className="text-xs font-bold text-slate-100 truncate mt-0.5">
-              {currentGps.address || 'Road Position'}
+            <p className="text-[11px] md:text-xs font-bold text-slate-100 truncate mt-0.5">
+              {currentGps.address || 'Road Track'}
             </p>
-            <p className="text-[10px] font-mono text-cyan-400 mt-0.5">
-              {currentGps.lat?.toFixed(5)}°N, {currentGps.lng?.toFixed(5)}°W • Acc: ±{currentGps.accuracy || 5}m
+            <p className="text-[9px] font-mono text-cyan-400 truncate">
+              {currentGps.lat?.toFixed(4)}°N, {currentGps.lng?.toFixed(4)}°W • Head {currentGps.heading || 0}°
             </p>
           </div>
         </div>
       )}
 
-      {/* Google Maps Road Pothole Legend */}
-      <div className="absolute bottom-6 left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-800 rounded-2xl px-3.5 py-2 shadow-2xl flex items-center gap-3 hidden sm:flex">
-        <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Pothole Spots:</span>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-          <span className="text-[10px] font-mono text-slate-300">Moderate Pothole</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-[10px] font-mono text-slate-300">Critical Crater</span>
-        </div>
-      </div>
-
       {/* Map Viewport Container */}
-      <div ref={mapContainerRef} className="w-full h-full min-h-[500px] z-10" />
+      <div ref={mapContainerRef} className="w-full h-full min-h-[400px] z-10" />
 
-      {/* Selected Hazard Drawer */}
+      {/* Selected Hazard Drawer / Bottom Card */}
       {selectedHazard && (
         <div
-          className={`absolute bottom-[65px] md:bottom-0 left-0 right-0 z-[500] bg-[#111827]/95 backdrop-blur-xl border-t border-slate-800 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
-            isSheetOpen ? 'translate-y-0' : 'translate-y-[calc(100%-44px)]'
-          }`}
+          className={`absolute bottom-[65px] md:bottom-3 left-2 right-2 md:left-auto md:right-4 md:w-96 z-[500] bg-[#111827]/95 backdrop-blur-2xl border border-slate-800 rounded-2xl shadow-[0_-8px_35px_rgba(0,0,0,0.7)] transition-all duration-300`}
         >
+          {/* Collapsed Header / Toggle */}
           <div
             onClick={() => setIsSheetOpen(!isSheetOpen)}
-            className="w-full flex flex-col items-center pt-3 pb-2 cursor-pointer group"
+            className="p-3 flex items-center justify-between cursor-pointer group"
           >
-            <div className="w-12 h-1.5 bg-slate-700 group-hover:bg-amber-400 rounded-full transition-colors" />
-          </div>
-
-          <div className="px-5 pb-6 pt-1 max-w-3xl mx-auto space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                      selectedHazard.severity === 'critical'
-                        ? 'bg-red-500/20 text-red-400 border-red-500/40 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                        : 'bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                    }`}
-                  >
-                    {selectedHazard.severity} Severity
-                  </span>
-                  <span className="text-xs font-mono text-slate-400">ID: {selectedHazard.id}</span>
-                </div>
-                <h2 className="font-heading text-xl font-bold text-slate-100">
-                  {selectedHazard.title || `Pothole at ${selectedHazard.coordsText || 'GPS Point'}`}
-                </h2>
-              </div>
-              <button
-                onClick={() => setIsSheetOpen(false)}
-                className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+            <div className="flex items-center gap-2 min-w-0 pr-2">
+              <span
+                className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+                  selectedHazard.severity === 'critical'
+                    ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                    : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                }`}
               >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
+                {selectedHazard.severity}
+              </span>
+              <p className="text-xs font-bold text-slate-100 truncate">
+                {selectedHazard.title || 'Road Defect'}
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="col-span-1 rounded-xl border border-slate-800 overflow-hidden relative aspect-video sm:aspect-square bg-slate-900 group">
-                <img
-                  src={
-                    selectedHazard.image?.startsWith('data:')
-                      ? selectedHazard.image
-                      : selectedHazard.image ||
-                        'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop'
-                  }
-                  alt={selectedHazard.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute top-2 right-2 bg-slate-950/80 backdrop-blur-md rounded px-2 py-0.5 text-[10px] font-mono text-cyan-400 flex items-center gap-1 border border-cyan-500/30">
-                  <span className="material-symbols-outlined text-[12px]">center_focus_strong</span>
-                  AI CONF {selectedHazard.confidence || '94%'}
-                </div>
-              </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] font-mono text-amber-400">
+                {isSheetOpen ? 'Hide' : 'Details'}
+              </span>
+              <span className="material-symbols-outlined text-base text-slate-400">
+                {isSheetOpen ? 'expand_more' : 'expand_less'}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedHazard(null);
+                }}
+                className="w-6 h-6 rounded-lg bg-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-200 ml-1"
+              >
+                <span className="material-symbols-outlined text-xs">close</span>
+              </button>
+            </div>
+          </div>
 
-              <div className="col-span-2 grid grid-cols-2 gap-2">
-                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-center">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
-                    GPS Coordinates
-                  </span>
-                  <span className="text-xs font-mono font-bold text-cyan-400 truncate">
-                    {selectedHazard.coordsText || `${selectedHazard.lat?.toFixed(5)}°N, ${selectedHazard.lng?.toFixed(5)}°W`}
-                  </span>
-                </div>
-
-                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-center">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
-                    Detected Timestamp
-                  </span>
-                  <span className="text-xs font-mono font-bold text-slate-200 truncate">
-                    {selectedHazard.detectedTime || selectedHazard.timestamp || 'Just now'}
-                  </span>
-                </div>
-
-                <div className="col-span-2 bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-400 text-base">traffic</span>
-                    <span className="text-xs text-slate-300 font-medium">
-                      Pavement Defect Pinned on GPS Road
-                    </span>
+          {/* Expanded Content */}
+          {isSheetOpen && (
+            <div className="px-3 pb-3 pt-1 border-t border-slate-800/80 flex flex-col gap-2.5 animate-in fade-in">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-slate-800 overflow-hidden relative aspect-video bg-black">
+                  <img
+                    src={
+                      selectedHazard.image?.startsWith('data:')
+                        ? selectedHazard.image
+                        : selectedHazard.image ||
+                          'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop'
+                    }
+                    alt={selectedHazard.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-1 right-1 bg-black/80 rounded px-1.5 py-0.5 text-[9px] font-mono text-cyan-400 border border-cyan-500/30">
+                    Conf {selectedHazard.confidence || '94%'}
                   </div>
-                  <span className="text-[11px] font-mono text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
-                    Road Defect
-                  </span>
+                </div>
+
+                <div className="flex flex-col justify-between text-xs font-mono">
+                  <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                    <span className="text-[9px] text-slate-400 uppercase">Coordinates</span>
+                    <p className="text-[10px] font-bold text-cyan-400 truncate mt-0.5">
+                      {selectedHazard.coordsText || `${selectedHazard.lat?.toFixed(4)}°N, ${selectedHazard.lng?.toFixed(4)}°W`}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800 mt-1">
+                    <span className="text-[9px] text-slate-400 uppercase">Detected</span>
+                    <p className="text-[10px] font-bold text-slate-200 truncate mt-0.5">
+                      {selectedHazard.detectedTime || selectedHazard.timestamp || 'Just now'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => {
-                  const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedHazard.lat},${selectedHazard.lng}`;
-                  window.open(url, '_blank');
-                  showToast?.(`Opening Google Maps navigation to ${selectedHazard.title}...`, 'info');
-                }}
-                className="flex-1 bg-slate-900 border border-slate-700/80 hover:border-amber-500/40 rounded-xl py-3 flex items-center justify-center gap-2 text-slate-200 font-semibold text-sm hover:bg-slate-800 transition-all"
-              >
-                <span className="material-symbols-outlined text-lg">directions</span>
-                Google Maps Route
-              </button>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedHazard.lat},${selectedHazard.lng}`;
+                    window.open(url, '_blank');
+                    showToast?.(`Opening Google Maps navigation...`, 'info');
+                  }}
+                  className="flex-1 bg-slate-900 border border-slate-700/80 hover:border-amber-500/40 rounded-xl py-2 flex items-center justify-center gap-1 text-slate-200 font-semibold text-xs transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm text-cyan-400">directions</span>
+                  Google Maps Route
+                </button>
 
-              <button
-                onClick={() => {
-                  showToast?.(`Hazard report dispatched for ${selectedHazard.id}!`, 'success');
-                }}
-                className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm py-3 rounded-xl shadow-[0_4px_20px_rgba(245,158,11,0.35)] transition-all flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-lg">assignment</span>
-                Dispatch Repair Unit
-              </button>
+                <button
+                  onClick={() => {
+                    showToast?.(`Hazard report dispatched for ${selectedHazard.id}!`, 'success');
+                  }}
+                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md shadow-amber-500/20"
+                >
+                  <span className="material-symbols-outlined text-sm">assignment</span>
+                  Dispatch
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </main>
