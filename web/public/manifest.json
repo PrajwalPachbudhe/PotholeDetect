@@ -1,0 +1,43 @@
+{
+  "name": "PotholeDetect - Road Hazard AI",
+  "short_name": "PotholeDetect",
+  "description": "Autonomous Real-Time Road Hazard & Pothole Detection GIS Vision System",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "orientation": "portrait-primary",
+  "categories": ["utilities", "navigation", "transportation"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Dashcam",
+      "short_name": "Dashcam",
+      "description": "Start live road defect camera scan",
+      "url": "/?view=scan",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hazard Map",
+      "short_name": "Map",
+      "description": "Open GIS hazard map",
+      "url": "/?view=map",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

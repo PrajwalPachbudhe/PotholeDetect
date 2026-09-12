@@ -126,6 +126,45 @@ function App() {
   // Toast state
   const [toast, setToast] = useState(null);
 
+  // Chrome PWA / WebAPK Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(true);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+  }, []);
+
+  const handleCloseToast = useCallback(() => {
+    setToast(null);
+  }, []);
+
+  const handleInstallApp = useCallback(async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        showToast('Installing PotholeDetect App...', 'success');
+        setDeferredPrompt(null);
+      }
+    } else {
+      showToast('📱 In Chrome: Tap 3 dots (⋮) > "Install app" or "Add to Home screen"', 'info');
+    }
+  }, [deferredPrompt, showToast]);
+
   // Geolocation & Road Simulation Engine
   const {
     coords: currentGps,
@@ -135,14 +174,6 @@ function App() {
     stopTracking: stopGpsTracking,
     toggleSimulation,
   } = useGeolocation();
-
-  const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-  }, []);
-
-  const handleCloseToast = useCallback(() => {
-    setToast(null);
-  }, []);
 
   // Periodic Backend Health Check & Fetch Remote Hazards
   useEffect(() => {
@@ -376,6 +407,7 @@ function App() {
           onNavigate={handleNavigate}
           isApiOnline={isApiOnline}
           apiUrl={apiUrl}
+          onInstallApp={handleInstallApp}
         />
 
         {currentView === 'scan' && (

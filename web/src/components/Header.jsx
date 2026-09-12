@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Header({ user, onLogout, currentView, onNavigate, isApiOnline, apiUrl }) {
+export default function Header({ user, onLogout, currentView, onNavigate, isApiOnline, apiUrl, onInstallApp }) {
   const [showMenu, setShowMenu] = useState(false);
 
   const navItems = [
@@ -61,12 +61,26 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
         })}
       </nav>
 
-      {/* Right Controls: Automatic AI Edge Status & User Profile */}
-      <div className="flex items-center gap-3">
+      {/* Right Controls: Install App, Automatic AI Edge Status & User Profile */}
+      <div className="flex items-center gap-2.5">
+        {/* PWA / Chrome Mobile App Install Button */}
+        {onInstallApp && (
+          <button
+            onClick={onInstallApp}
+            title="Install PotholeDetect App on Android / PC"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-500/40 text-amber-300 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] active:scale-95"
+          >
+            <span className="material-symbols-outlined text-sm text-amber-400">
+              install_mobile
+            </span>
+            <span className="text-[11px] font-mono font-bold">Install App</span>
+          </button>
+        )}
+
         {/* Live Backend Connection Status Pill */}
         <div
           title="AI Inference Cloud Edge Connection"
-          className="hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 transition-all text-left"
+          className="hidden lg:flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 transition-all text-left"
         >
           <span className={`w-2 h-2 rounded-full ${isApiOnline ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
           <div className="flex flex-col">
