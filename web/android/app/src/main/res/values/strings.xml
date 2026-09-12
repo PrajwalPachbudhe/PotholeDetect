@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PotholeDetect</string>
+    <string name="title_activity_main">PotholeDetect</string>
+    <string name="package_name">com.prajwal.potholedetect</string>
+    <string name="custom_url_scheme">com.prajwal.potholedetect</string>
+</resources>

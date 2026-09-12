@@ -10,6 +10,7 @@ import MapView from './components/MapView';
 import LoginView from './components/LoginView';
 import SignupView from './components/SignupView';
 import ForgotPasswordView from './components/ForgotPasswordView';
+import InstallModal from './components/InstallModal';
 import Toast from './components/Toast';
 import ClickSpark from './components/ClickSpark';
 import { useGeolocation } from './utils/useGeolocation';
@@ -128,13 +129,12 @@ function App() {
 
   // Chrome PWA / WebAPK Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstallable, setIsInstallable] = useState(true);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsInstallable(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -152,7 +152,11 @@ function App() {
     setToast(null);
   }, []);
 
-  const handleInstallApp = useCallback(async () => {
+  const handleInstallApp = useCallback(() => {
+    setIsInstallModalOpen(true);
+  }, []);
+
+  const handlePwaInstallDirect = useCallback(async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -161,7 +165,7 @@ function App() {
         setDeferredPrompt(null);
       }
     } else {
-      showToast('📱 In Chrome: Tap 3 dots (⋮) > "Install app" or "Add to Home screen"', 'info');
+      showToast('📱 Tap Chrome menu (⋮) > "Install app" or "Add to Home screen"', 'info');
     }
   }, [deferredPrompt, showToast]);
 
@@ -509,6 +513,15 @@ function App() {
           user={user}
           currentView={currentView === 'results' ? 'scan' : currentView}
           onNavigate={handleNavigate}
+        />
+
+        {/* Mobile APK & App Install Modal */}
+        <InstallModal
+          isOpen={isInstallModalOpen}
+          onClose={() => setIsInstallModalOpen(false)}
+          deferredPrompt={deferredPrompt}
+          onPwaInstall={handlePwaInstallDirect}
+          showToast={showToast}
         />
       </div>
     </ClickSpark>
