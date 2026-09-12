@@ -15,11 +15,14 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
     setIsTesting(true);
     setHealthStatus(null);
     try {
-      const cleanUrl = tempUrl.replace(/\/+$/, '');
+      const cleanUrl = tempUrl.trim().replace(/\/+$/, '');
       const res = await fetch(`${cleanUrl}/api/health`, {
         method: 'GET',
-        headers: { 'Bypass-Tunnel-Reminder': 'true' },
-        signal: AbortSignal.timeout(5000)
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+        signal: AbortSignal.timeout(6000),
       });
       if (res.ok) {
         const data = await res.json();
@@ -30,7 +33,10 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
         showToast?.(`Backend check failed: HTTP ${res.status}`, 'error');
       }
     } catch (err) {
-      setHealthStatus({ ok: false, message: err.message || 'Failed to connect to backend server' });
+      setHealthStatus({
+        ok: false,
+        message: err.message || 'Failed to connect to backend server. Verify your ngrok tunnel is running.',
+      });
       showToast?.('Could not reach backend server', 'error');
     } finally {
       setIsTesting(false);
@@ -55,7 +61,7 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div 
+      <div
         className="w-full max-w-lg bg-[#111827] border border-amber-500/30 rounded-2xl p-6 shadow-[0_0_50px_rgba(245,158,11,0.15)] flex flex-col gap-5 relative"
         onClick={(e) => e.stopPropagation()}
       >
@@ -66,11 +72,15 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
               <span className="material-symbols-outlined text-xl">tune</span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-100 font-heading">System & API Settings</h3>
-              <p className="text-xs text-slate-400">Configure YOLO backend endpoints and telemetry</p>
+              <h3 className="text-lg font-bold text-slate-100 font-heading">
+                Render & ngrok Backend Settings
+              </h3>
+              <p className="text-xs text-slate-400">
+                Connect your Render frontend to your live ngrok YOLOv8 tunnel
+              </p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-colors"
           >
@@ -82,14 +92,14 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-amber-400 text-sm">lan</span>
-            Flask Backend URL
+            Flask Backend URL (ngrok / Cloud / Local)
           </label>
           <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={tempUrl} 
-              onChange={(e) => setTempUrl(e.target.value)} 
-              placeholder="http://localhost:5000 or tunnel URL"
+            <input
+              type="text"
+              value={tempUrl}
+              onChange={(e) => setTempUrl(e.target.value)}
+              placeholder="https://xxxx.ngrok-free.app or http://localhost:5000"
               className="flex-1 bg-slate-900/90 border border-slate-700 focus:border-amber-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 outline-none font-mono transition-colors"
             />
             <button
@@ -102,17 +112,23 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
               ) : (
                 <span className="material-symbols-outlined text-sm text-amber-400">network_ping</span>
               )}
-              Test
+              Test Ping
             </button>
           </div>
           <p className="text-[11px] text-slate-400">
-            Default: <span className="font-mono text-amber-400">http://localhost:5000</span>. For remote devices or mobile testing, use your tunnel URL.
+            For Render web app: run <code className="text-amber-400 bg-slate-950 px-1 py-0.5 rounded font-mono">ngrok http 5000</code> locally and paste your public <code className="text-cyan-400 font-mono">https://xxxx.ngrok-free.app</code> URL here.
           </p>
         </div>
 
         {/* Health status readout */}
         {healthStatus && (
-          <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${healthStatus.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+              healthStatus.ok
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}
+          >
             <span className="material-symbols-outlined text-base">
               {healthStatus.ok ? 'check_circle' : 'error'}
             </span>
@@ -120,13 +136,19 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
           </div>
         )}
 
-        {/* Preset Quick Switches */}
+        {/* Quick Connection Presets */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Presets</label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Connection Presets
+          </label>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setTempUrl('http://localhost:5000')}
-              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${tempUrl === 'http://localhost:5000' ? 'bg-amber-500/15 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'}`}
+              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
+                tempUrl === 'http://localhost:5000'
+                  ? 'bg-amber-500/15 border-amber-500 text-amber-400'
+                  : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+              }`}
             >
               <span className="font-bold flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">computer</span>
@@ -135,14 +157,20 @@ export default function SettingsModal({ isOpen, onClose, apiUrl, setApiUrl, show
               <span className="font-mono text-[10px] text-slate-400 truncate">http://localhost:5000</span>
             </button>
             <button
-              onClick={() => setTempUrl('https://8ba7e67c6c1ab7.lhr.life')}
-              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${tempUrl === 'https://8ba7e67c6c1ab7.lhr.life' ? 'bg-amber-500/15 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'}`}
+              onClick={() => {
+                setTempUrl('https://oversleep-relic-stubbed.ngrok-free.dev');
+              }}
+              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
+                tempUrl.includes('oversleep-relic-stubbed')
+                  ? 'bg-amber-500/15 border-amber-500 text-amber-400'
+                  : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+              }`}
             >
               <span className="font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">cloud</span>
-                Cloud / Tunnel
+                <span className="material-symbols-outlined text-sm">cloud_sync</span>
+                My ngrok Domain
               </span>
-              <span className="font-mono text-[10px] text-slate-400 truncate">Pinggy / Localtunnel</span>
+              <span className="font-mono text-[10px] text-slate-400 truncate">oversleep-relic-stubbed...</span>
             </button>
           </div>
         </div>

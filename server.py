@@ -8,7 +8,7 @@ import io
 import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers=["*"], expose_headers=["*"])
 
 # Load model once on startup
 MODEL_PATH = "runs/detect/train-3/weights/best.pt"
@@ -61,11 +61,30 @@ def detect():
     _, orig_buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
     original_b64 = base64.b64encode(orig_buffer).decode("utf-8")
 
+    # Optional GPS metadata attached to upload
+    lat = request.form.get("latitude") or request.form.get("lat")
+    lng = request.form.get("longitude") or request.form.get("lng")
+    speed = request.form.get("speed")
+    address = request.form.get("address")
+    
+    gps_info = None
+    if lat and lng:
+        try:
+            gps_info = {
+                "lat": float(lat),
+                "lng": float(lng),
+                "speed": float(speed) if speed else 0,
+                "address": address or f"{float(lat):.4f}°N, {float(lng):.4f}°W"
+            }
+        except Exception:
+            pass
+
     return jsonify({
         "original": original_b64,
         "annotated": annotated_b64,
         "detections": detections,
         "total_detections": len(detections),
+        "gps": gps_info,
         "image_size": {
             "width": img.shape[1],
             "height": img.shape[0]
@@ -110,6 +129,39 @@ def stream_detect():
     return jsonify({"detections": detections})
 
 
+HAZARDS_FILE = "hazards.json"
+
+@app.route("/api/hazards", methods=["GET", "POST"])
+def manage_hazards():
+    import json
+    if request.method == "POST":
+        data = request.get_json() or {}
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        hazards = []
+        if os.path.exists(HAZARDS_FILE):
+            try:
+                with open(HAZARDS_FILE, "r") as f:
+                    hazards = json.load(f)
+            except Exception:
+                hazards = []
+        
+        hazards.insert(0, data)
+        with open(HAZARDS_FILE, "w") as f:
+            json.dump(hazards[:200], f, indent=2)
+            
+        return jsonify({"status": "saved", "hazard": data}), 201
+    else:
+        if os.path.exists(HAZARDS_FILE):
+            try:
+                with open(HAZARDS_FILE, "r") as f:
+                    hazards = json.load(f)
+                return jsonify({"hazards": hazards})
+            except Exception:
+                pass
+        return jsonify({"hazards": []})
+
 
 @app.route("/", methods=["GET", "HEAD"])
 def index():
@@ -123,3 +175,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 Pothole Detection API starting on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
+

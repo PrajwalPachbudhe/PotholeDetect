@@ -1,12 +1,30 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { speakAlert } from '../utils/useGeolocation';
 
-export default function ScanView({ onDetectionComplete, isLoading, setIsLoading, apiUrl, onOpenSettings, showToast }) {
+export default function ScanView({
+  onDetectionComplete,
+  onAutoLogHazard,
+  isLoading,
+  setIsLoading,
+  apiUrl,
+  onOpenSettings,
+  currentGps,
+  isGpsTracking,
+  isSimulating,
+  onStartGps,
+  onStopGps,
+  onToggleSimulation,
+  showToast,
+}) {
   const [scanMode, setScanMode] = useState('upload'); // 'upload' | 'camera'
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.15);
-  
+  const [isDriveModeActive, setIsDriveModeActive] = useState(false);
+  const [isVoiceAlertEnabled, setIsVoiceAlertEnabled] = useState(true);
+  const [recentDetectionAlert, setRecentDetectionAlert] = useState(null);
+
   // Camera HUD State
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -18,37 +36,41 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
   const [liveLatency, setLiveLatency] = useState(0);
   const [isConnected, setIsConnected] = useState(true);
   const fileInputRef = useRef(null);
+  const lastAutoLogTimeRef = useRef(0);
 
-  // Preset Sample Images (High Quality Road Hazard Demos)
+  // Sample preset demo images
   const sampleImages = [
     {
       id: 'pothole-1',
-      title: 'Severe Asphalt Pothole',
-      desc: 'Deep crater on high-speed arterial road',
+      title: 'Main St Bridge Severe Pothole',
+      desc: 'Deep asphalt crater on high-speed arterial road',
       badge: 'High Severity',
       badgeColor: 'bg-red-500/20 text-red-400 border-red-500/30',
       url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80',
+      gps: { lat: 34.0522, lng: -118.2437, address: '1400 Main St Bridge, LA' },
     },
     {
       id: 'pothole-2',
-      title: 'Multiple Road Fractures',
-      desc: 'Surface deterioration and cluster potholes',
+      title: 'Grand Ave Cluster Fractures',
+      desc: 'Severe pavement deterioration and multiple potholes',
       badge: 'Cluster Hazards',
       badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
       url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80',
+      gps: { lat: 34.0545, lng: -118.2520, address: 'Grand Ave & 5th St, LA' },
     },
     {
       id: 'crack-1',
-      title: 'Transverse Asphalt Fissure',
-      desc: 'Longitudinal distress across traffic lane',
+      title: 'Broadway Asphalt Transverse Fissure',
+      desc: 'Longitudinal road distress across traffic lanes',
       badge: 'Surface Crack',
       badgeColor: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
       url: 'https://images.unsplash.com/photo-1590496793929-36417d3117de?auto=format&fit=crop&w=800&q=80',
+      gps: { lat: 34.0485, lng: -118.2495, address: 'Broadway Boulevard #42, LA' },
     },
   ];
 
-  // Run File Detection via /api/detect
-  const runFileDetection = async (file) => {
+  // Run File Detection via /api/detect with GPS Geotagging
+  const runFileDetection = async (file, customGps = null) => {
     setIsLoading(true);
     const startTime = performance.now();
 
@@ -56,10 +78,22 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
       const formData = new FormData();
       formData.append('image', file);
 
+      // Attach GPS coordinates if available
+      const activeGps = customGps || currentGps;
+      if (activeGps && activeGps.lat && activeGps.lng) {
+        formData.append('lat', activeGps.lat);
+        formData.append('lng', activeGps.lng);
+        formData.append('speed', activeGps.speed || 0);
+        formData.append('address', activeGps.address || '');
+      }
+
       const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
       const response = await fetch(`${targetUrl}/api/detect`, {
         method: 'POST',
-        headers: { 'Bypass-Tunnel-Reminder': 'true' },
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
         body: formData,
       });
 
@@ -69,9 +103,30 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
 
       const data = await response.json();
       const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
-      
-      showToast?.(`Detected ${data.total_detections} hazard${data.total_detections === 1 ? '' : 's'} in ${elapsed}s`, 'success');
-      onDetectionComplete(data, elapsed);
+
+      // Ensure GPS metadata is injected into the detection result
+      const enrichedData = {
+        ...data,
+        gps: data.gps || activeGps || {
+          lat: 34.0522,
+          lng: -118.2437,
+          address: 'Main St & 4th Ave, Los Angeles, CA',
+        },
+      };
+
+      showToast?.(
+        `Detected ${enrichedData.total_detections} hazard${
+          enrichedData.total_detections === 1 ? '' : 's'
+        } with GPS geotag in ${elapsed}s`,
+        'success'
+      );
+
+      // If potholes were found, auto-log to the global map & traffic layer
+      if (enrichedData.total_detections > 0 && onAutoLogHazard) {
+        onAutoLogHazard(enrichedData);
+      }
+
+      onDetectionComplete(enrichedData, elapsed);
     } catch (err) {
       console.error('Detection error:', err);
       showToast?.(`Backend connection error: ${err.message}. Check API Settings.`, 'error');
@@ -87,7 +142,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
       const blob = await res.blob();
       const file = new File([blob], `${sample.id}.jpg`, { type: 'image/jpeg' });
       setSelectedImage(file);
-      await runFileDetection(file);
+      await runFileDetection(file, sample.gps);
     } catch (err) {
       showToast?.('Failed to load sample image. Please upload a local file.', 'error');
       setIsLoading(false);
@@ -113,7 +168,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
       setSelectedImage(file);
       runFileDetection(file);
     }
-  }, []);
+  }, [currentGps]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -127,7 +182,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
   useEffect(() => {
     if (scanMode !== 'camera') {
       if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+        videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
         videoRef.current.srcObject = null;
       }
       setCameraActive(false);
@@ -158,12 +213,12 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
 
     return () => {
       if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach((t) => t.stop());
       }
     };
   }, [scanMode, facingMode]);
 
-  // Live Stream Inference Loop
+  // Live Stream Continuous Inference Loop & Automated GPS Hazard Pinning
   useEffect(() => {
     if (scanMode !== 'camera' || !cameraActive) return;
 
@@ -183,25 +238,73 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
           const ctx = offCanvas.getContext('2d');
           ctx.drawImage(videoRef.current, 0, 0, 640, 480);
 
-          const blob = await new Promise(res => offCanvas.toBlob(res, 'image/jpeg', 0.65));
+          const blob = await new Promise((res) => offCanvas.toBlob(res, 'image/jpeg', 0.65));
           const formData = new FormData();
           formData.append('image', blob);
 
           const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
           const res = await fetch(`${targetUrl}/api/stream_detect`, {
             method: 'POST',
-            headers: { 'Bypass-Tunnel-Reminder': 'true' },
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+              'Bypass-Tunnel-Reminder': 'true',
+            },
             body: formData,
             signal: AbortSignal.timeout(2000),
           });
 
           if (res.ok) {
             const data = await res.json();
-            const filteredBoxes = (data.detections || []).filter(b => b.confidence >= confidenceThreshold);
+            const filteredBoxes = (data.detections || []).filter(
+              (b) => b.confidence >= confidenceThreshold
+            );
             setLiveBoxes(filteredBoxes);
             setIsConnected(true);
             const latency = Math.round(performance.now() - frameStart);
             setLiveLatency(latency);
+
+            // Automated GPS Hazard Logging during Drive Dashcam Mode
+            if (filteredBoxes.length > 0) {
+              const now = Date.now();
+              // Debounce auto-logging every 3.5 seconds
+              if (now - lastAutoLogTimeRef.current > 3500) {
+                lastAutoLogTimeRef.current = now;
+                const topBox = filteredBoxes[0];
+                const confPercent = Math.round(topBox.confidence * 100);
+
+                setRecentDetectionAlert({
+                  text: `Pothole Identified (${confPercent}%)`,
+                  address: currentGps?.address || 'Current GPS Location',
+                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                });
+
+                // Voice Speech Alert
+                if (isVoiceAlertEnabled) {
+                  speakAlert(
+                    `Warning! Severe pothole detected ahead on ${
+                      currentGps?.address?.split(',')[0] || 'the roadway'
+                    }`
+                  );
+                }
+
+                // Push to global Map and Traffic layer
+                if (onAutoLogHazard) {
+                  // Capture thumbnail snapshot
+                  const snapshotUrl = offCanvas.toDataURL('image/jpeg', 0.8);
+                  onAutoLogHazard({
+                    original: snapshotUrl.split(',')[1],
+                    annotated: snapshotUrl.split(',')[1],
+                    total_detections: filteredBoxes.length,
+                    detections: filteredBoxes.map((b) => ({
+                      name: b.name,
+                      confidence: Math.round(b.confidence * 100),
+                      bbox: { x1: b.x1, y1: b.y1, x2: b.x2, y2: b.y2 },
+                    })),
+                    gps: currentGps,
+                  });
+                }
+              }
+            }
           } else {
             setIsConnected(false);
           }
@@ -219,7 +322,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
       }
 
       if (isRunning) {
-        setTimeout(streamInference, 350); // ~3 FPS for optimal responsiveness & low bandwidth
+        setTimeout(streamInference, 320); // ~3 FPS
       }
     }
 
@@ -228,7 +331,15 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
     return () => {
       isRunning = false;
     };
-  }, [scanMode, cameraActive, apiUrl, confidenceThreshold]);
+  }, [
+    scanMode,
+    cameraActive,
+    apiUrl,
+    confidenceThreshold,
+    currentGps,
+    isVoiceAlertEnabled,
+    onAutoLogHazard,
+  ]);
 
   // Draw Live Bounding Boxes on Overlay Canvas
   useEffect(() => {
@@ -242,7 +353,6 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
 
     if (liveBoxes.length === 0) return;
 
-    // Relative to 640x480 inference resolution
     const scaleX = canvas.width / 640;
     const scaleY = canvas.height / 480;
 
@@ -254,16 +364,16 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
       const bh = (y2 - y1) * scaleY;
 
       // Glow bounding rectangle
-      ctx.shadowColor = '#f59e0b';
-      ctx.shadowBlur = 12;
-      ctx.strokeStyle = '#f59e0b';
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(px, py, bw, bh);
 
       // Corner accent brackets
-      const cornerLength = Math.min(12, bw / 4, bh / 4);
+      const cornerLength = Math.min(14, bw / 3, bh / 3);
       ctx.lineWidth = 4;
-      ctx.strokeStyle = '#fbbf24';
+      ctx.strokeStyle = '#f87171';
       ctx.shadowBlur = 0;
 
       // Top-Left
@@ -281,15 +391,15 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
       ctx.stroke();
 
       // Label Tag
-      const labelText = `${name.toUpperCase()} ${Math.round(confidence * 100)}%`;
+      const labelText = `⚠️ ${name.toUpperCase()} ${Math.round(confidence * 100)}%`;
       ctx.font = 'bold 12px "JetBrains Mono", monospace';
       const textWidth = ctx.measureText(labelText).width;
 
-      ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(px, Math.max(0, py - 20), textWidth + 12, 20);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(px, Math.max(0, py - 22), textWidth + 14, 22);
 
-      ctx.fillStyle = '#0f172a';
-      ctx.fillText(labelText, px + 6, Math.max(14, py - 5));
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(labelText, px + 6, Math.max(15, py - 6));
     });
   }, [liveBoxes, scanMode]);
 
@@ -307,7 +417,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
         const file = new File([blob], `live_snapshot_${Date.now()}.jpg`, { type: 'image/jpeg' });
         setSelectedImage(file);
         setScanMode('upload');
-        await runFileDetection(file);
+        await runFileDetection(file, currentGps);
       }
     }, 'image/jpeg', 0.9);
   };
@@ -325,7 +435,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
               AI Road Hazard Scanner
             </h1>
             <p className="text-xs md:text-sm text-slate-400">
-              High-precision YOLOv8 neural network for pothole and pavement distress detection
+              YOLOv8 deep learning road inspection with live GPS tracking & traffic congestion mapping
             </p>
           </div>
         </div>
@@ -352,7 +462,105 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
             }`}
           >
             <span className="material-symbols-outlined text-base">videocam</span>
-            Live Stream HUD
+            Live Dashcam HUD
+          </button>
+        </div>
+      </div>
+
+      {/* GPS Telemetry & Drive Mode Ribbon */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          {/* GPS Status Indicator */}
+          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                isSimulating
+                  ? 'bg-blue-400 animate-pulse'
+                  : isGpsTracking
+                  ? 'bg-emerald-400 animate-ping'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-xs font-mono font-bold text-slate-200">
+              {isSimulating
+                ? '🚗 SIMULATING DRIVE'
+                : isGpsTracking
+                ? '📡 GPS LOCKED'
+                : '📍 GPS READY'}
+            </span>
+          </div>
+
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-slate-100 flex items-center gap-1.5 truncate max-w-[280px]">
+              <span className="material-symbols-outlined text-sm text-cyan-400">location_on</span>
+              {currentGps?.address || 'Downtown Road Corridor'}
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">
+              {currentGps?.lat?.toFixed(5)}°N, {currentGps?.lng?.toFixed(5)}°W • {currentGps?.speed || 0} km/h • Heading {currentGps?.heading || 0}°
+            </span>
+          </div>
+        </div>
+
+        {/* GPS Action Controls */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (isSimulating) {
+                onToggleSimulation?.();
+                showToast?.('Drive simulation ended', 'info');
+              } else {
+                onToggleSimulation?.();
+                showToast?.('🚗 Live road drive route simulation active', 'success');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              isSimulating
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)] animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">directions_car</span>
+            {isSimulating ? 'Stop Simulation' : 'Simulate Drive'}
+          </button>
+
+          <button
+            onClick={() => {
+              if (isGpsTracking && !isSimulating) {
+                onStopGps?.();
+                showToast?.('Hardware GPS paused', 'info');
+              } else {
+                onStartGps?.();
+                showToast?.('Live Device GPS enabled', 'success');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              isGpsTracking && !isSimulating
+                ? 'bg-emerald-500 text-slate-950 font-bold'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">my_location</span>
+            {isGpsTracking && !isSimulating ? 'GPS Active' : 'Enable Device GPS'}
+          </button>
+
+          <button
+            onClick={() => {
+              setIsVoiceAlertEnabled(!isVoiceAlertEnabled);
+              showToast?.(
+                isVoiceAlertEnabled ? 'Voice warnings muted' : 'Voice warnings active',
+                'info'
+              );
+            }}
+            className={`p-1.5 rounded-xl border transition-colors ${
+              isVoiceAlertEnabled
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                : 'bg-slate-800 text-slate-500 border-slate-700'
+            }`}
+            title="Toggle Voice Alerts for Potholes"
+          >
+            <span className="material-symbols-outlined text-base">
+              {isVoiceAlertEnabled ? 'volume_up' : 'volume_off'}
+            </span>
           </button>
         </div>
       </div>
@@ -382,7 +590,6 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                 className="hidden"
               />
 
-              {/* Ambient Glow Backdrop */}
               <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 via-transparent to-transparent pointer-events-none" />
 
               <AnimatePresence mode="wait">
@@ -402,10 +609,10 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                     </div>
                     <div className="flex flex-col gap-1">
                       <h3 className="text-lg font-bold text-slate-100 font-heading">
-                        Analyzing Road Surface...
+                        Analyzing Road Surface & Geotagging...
                       </h3>
                       <p className="text-xs text-slate-400 font-mono">
-                        Executing YOLOv8 inference on target image
+                        Executing YOLOv8 inference and registering road traffic coordinates
                       </p>
                     </div>
                   </motion.div>
@@ -425,7 +632,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                         Drop Road Photo Here or <span className="text-amber-400 underline">Browse</span>
                       </h3>
                       <p className="text-xs text-slate-400 mt-1">
-                        Supports JPEG, PNG, WEBP high-resolution road & street captures (Max 15MB)
+                        Auto-geotags detected potholes with your GPS location and updates the Google Maps traffic layer
                       </p>
                     </div>
 
@@ -434,7 +641,10 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                         ⚡ Instant AI Detection
                       </span>
                       <span className="px-3 py-1 rounded-full bg-slate-800 text-[11px] font-mono text-slate-300 border border-slate-700">
-                        🎯 Multi-Class Segmentation
+                        🛰️ Auto GPS Geotagging
+                      </span>
+                      <span className="px-3 py-1 rounded-full bg-slate-800 text-[11px] font-mono text-slate-300 border border-slate-700">
+                        🚦 Road Traffic Indicator
                       </span>
                     </div>
                   </motion.div>
@@ -442,16 +652,16 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
               </AnimatePresence>
             </div>
 
-            {/* Quick-Start Demo Sample Road Cards */}
+            {/* Quick-Start Demo Samples with GPS Coordinates */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-400 text-sm">flash_on</span>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
-                    Try Instant Demo Samples (1-Click Test)
+                    Test Road Scans (Auto Geotagged to Traffic Map)
                   </h3>
                 </div>
-                <span className="text-[11px] text-slate-500">Click any preset to run detection</span>
+                <span className="text-[11px] text-slate-500">1-click test with GPS road pinning</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -480,7 +690,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-slate-200 line-clamp-1">{sample.title}</h4>
-                      <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{sample.desc}</p>
+                      <p className="text-[10px] font-mono text-cyan-400 mt-0.5">{sample.gps.address}</p>
                     </div>
                   </div>
                 ))}
@@ -488,7 +698,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
             </div>
           </div>
         ) : (
-          /* ================= CAMERA HUD MODE ================= */
+          /* ================= LIVE DASHCAM CAMERA MODE ================= */
           <div className="flex flex-col gap-4">
             <div className="relative w-full aspect-[4/3] md:aspect-video bg-black rounded-3xl overflow-hidden border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.15)] flex items-center justify-center">
               {!cameraError ? (
@@ -505,13 +715,26 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                     className="absolute inset-0 w-full h-full pointer-events-none"
                   />
 
-                  {/* HUD Framing Crosshairs & Reticles */}
+                  {/* Top Notification Toast for Live Pothole Logging */}
+                  {recentDetectionAlert && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600/95 border border-red-400 text-white px-4 py-2 rounded-2xl shadow-[0_0_25px_rgba(239,68,68,0.8)] flex items-center gap-2.5 animate-bounce">
+                      <span className="material-symbols-outlined text-xl">crisis_alert</span>
+                      <div>
+                        <p className="text-xs font-bold">{recentDetectionAlert.text}</p>
+                        <p className="text-[10px] text-red-100 font-mono">
+                          📍 Geotagged at {recentDetectionAlert.address} • Road marked RED
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* HUD Framing & Telemetry Overlays */}
                   <div className="absolute inset-0 pointer-events-none border border-amber-500/10 m-4 rounded-2xl flex flex-col justify-between p-4">
-                    {/* Top HUD Telemetry */}
+                    {/* Top HUD Telemetry Bar */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-xl">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                        <span className="font-mono text-xs font-bold text-slate-200">LIVE FEED</span>
+                        <span className="font-mono text-xs font-bold text-slate-200">DASHCAM FEED</span>
                         <span className="text-slate-600">|</span>
                         <span className="font-mono text-xs text-amber-400">{liveFps} FPS</span>
                         <span className="text-slate-600">|</span>
@@ -519,9 +742,9 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                       </div>
 
                       <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-xl">
-                        <span className="material-symbols-outlined text-sm text-amber-400">warning</span>
-                        <span className="font-mono text-xs font-bold text-amber-400">
-                          {liveBoxes.length} HAZARD{liveBoxes.length === 1 ? '' : 'S'} IN VIEW
+                        <span className="material-symbols-outlined text-sm text-red-400">warning</span>
+                        <span className="font-mono text-xs font-bold text-red-400">
+                          {liveBoxes.length} POTHOLE{liveBoxes.length === 1 ? '' : 'S'} DETECTED
                         </span>
                       </div>
                     </div>
@@ -537,7 +760,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                     <div className="flex items-center justify-between pointer-events-auto">
                       <button
                         onClick={() =>
-                          setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'))
+                          setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))
                         }
                         className="p-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-xl flex items-center gap-1.5 text-xs font-semibold backdrop-blur-md transition-colors"
                       >
@@ -552,7 +775,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
                         className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-bold shadow-[0_0_20px_rgba(245,158,11,0.4)] flex items-center gap-2 transition-all active:scale-95"
                       >
                         <span className="material-symbols-outlined text-lg">camera</span>
-                        Capture & Inspect
+                        Snapshot & Geotag
                       </button>
                     </div>
                   </div>
@@ -581,7 +804,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
         )}
       </div>
 
-      {/* Telemetry & System Status Footer Strip */}
+      {/* Telemetry & System Status Footer */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">AI Model</span>
@@ -592,7 +815,7 @@ export default function ScanView({ onDetectionComplete, isLoading, setIsLoading,
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Confidence Threshold</span>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Confidence Cutoff</span>
           <div className="flex items-center gap-2">
             <input
               type="range"

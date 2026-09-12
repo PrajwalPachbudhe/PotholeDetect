@@ -825,3 +825,46 @@ body {
   color: #f59e0b !important;
 }
 
+/* Google Maps Traffic Road Lines & Animation */
+.traffic-danger-line {
+  stroke-dasharray: 8, 4;
+  animation: trafficPulse 2s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+}
+
+.traffic-warning-line {
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
+}
+
+@keyframes trafficPulse {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Google Maps Traffic Tooltip */
+.google-maps-traffic-tooltip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+  padding: 0 !important;
+  color: #f8fafc !important;
+}
+
+.google-maps-traffic-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.95) !important;
+}
+
+.custom-vehicle-marker,
+.custom-pothole-marker,
+.custom-incident-badge {
+  background: transparent !important;
+  border: none !important;
+}
+
+

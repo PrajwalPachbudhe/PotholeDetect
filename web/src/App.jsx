@@ -12,12 +12,94 @@ import ForgotPasswordView from './components/ForgotPasswordView';
 import SettingsModal from './components/SettingsModal';
 import Toast from './components/Toast';
 import ClickSpark from './components/ClickSpark';
+import { useGeolocation } from './utils/useGeolocation';
+
+const DEFAULT_HAZARDS = [
+  {
+    id: 'PTH-992A',
+    title: '1400 Main St Bridge',
+    lat: 34.0522,
+    lng: -118.2437,
+    severity: 'critical',
+    detectedTime: '10:42 AM Today',
+    coordsText: '34.0522° N, 118.2437° W',
+    confidence: '94.5%',
+    image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-884B',
+    title: 'Grand Ave & 5th St',
+    lat: 34.0545,
+    lng: -118.2520,
+    severity: 'critical',
+    detectedTime: '11:15 AM Today',
+    coordsText: '34.0545° N, 118.2520° W',
+    confidence: '91.2%',
+    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-771C',
+    title: 'Broadway Boulevard #42',
+    lat: 34.0485,
+    lng: -118.2495,
+    severity: 'moderate',
+    detectedTime: '08:30 AM Today',
+    coordsText: '34.0485° N, 118.2495° W',
+    confidence: '86.8%',
+    image: 'https://images.unsplash.com/photo-1578637387939-43c525550085?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-650D',
+    title: 'Wilshire & Hope Intersection',
+    lat: 34.0498,
+    lng: -118.2580,
+    severity: 'moderate',
+    detectedTime: 'Yesterday, 4:20 PM',
+    coordsText: '34.0498° N, 118.2580° W',
+    confidence: '82.0%',
+    image: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-512E',
+    title: 'Sunset Highway Mile 12',
+    lat: 34.0570,
+    lng: -118.2400,
+    severity: 'critical',
+    detectedTime: 'Yesterday, 2:10 PM',
+    coordsText: '34.0570° N, 118.2400° W',
+    confidence: '97.1%',
+    image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
+  },
+  {
+    id: 'PTH-403F',
+    title: 'Olympic Blvd Overpass',
+    lat: 34.0420,
+    lng: -118.2550,
+    severity: 'moderate',
+    detectedTime: '2 Days Ago',
+    coordsText: '34.0420° N, 118.2550° W',
+    confidence: '89.4%',
+    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop',
+  },
+];
 
 function App() {
   const [currentView, setCurrentView] = useState('scan');
   const [results, setResults] = useState(null);
   const [analysisTime, setAnalysisTime] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Global Hazards State (synced across Map, Scanner, and localStorage)
+  const [hazards, setHazards] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pothole_hazards_list');
+      return saved ? JSON.parse(saved) : DEFAULT_HAZARDS;
+    } catch {
+      return DEFAULT_HAZARDS;
+    }
+  });
+
+  // History State
   const [history, setHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('pothole_scan_history');
@@ -27,7 +109,7 @@ function App() {
     }
   });
 
-  // API Backend URL state (stored in localStorage)
+  // API Backend URL state
   const [apiUrl, setApiUrl] = useState(() => {
     return localStorage.getItem('pothole_api_url') || 'http://localhost:5000';
   });
@@ -44,6 +126,16 @@ function App() {
   // Toast state
   const [toast, setToast] = useState(null);
 
+  // Geolocation & Road Simulation Engine
+  const {
+    coords: currentGps,
+    isTracking: isGpsTracking,
+    isSimulating,
+    startTracking: startGpsTracking,
+    stopTracking: stopGpsTracking,
+    toggleSimulation,
+  } = useGeolocation();
+
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
   }, []);
@@ -52,7 +144,7 @@ function App() {
     setToast(null);
   }, []);
 
-  // Periodic Backend Health Check
+  // Periodic Backend Health Check & Fetch Remote Hazards
   useEffect(() => {
     let isMounted = true;
     async function checkHealth() {
@@ -60,11 +152,39 @@ function App() {
         const clean = apiUrl.replace(/\/+$/, '');
         const res = await fetch(`${clean}/api/health`, {
           method: 'GET',
-          headers: { 'Bypass-Tunnel-Reminder': 'true' },
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
           signal: AbortSignal.timeout(4000),
         });
         if (isMounted) {
           setIsApiOnline(res.ok);
+        }
+
+        // Fetch remote hazards if available
+        if (res.ok) {
+          try {
+            const hRes = await fetch(`${clean}/api/hazards`, {
+              headers: {
+                'ngrok-skip-browser-warning': 'true',
+                'Bypass-Tunnel-Reminder': 'true',
+              },
+              signal: AbortSignal.timeout(3000),
+            });
+            if (hRes.ok) {
+              const hData = await hRes.json();
+              if (hData.hazards && hData.hazards.length > 0 && isMounted) {
+                setHazards((prev) => {
+                  const existingIds = new Set(prev.map((h) => h.id));
+                  const newItems = hData.hazards.filter((h) => !existingIds.has(h.id));
+                  return [...newItems, ...prev];
+                });
+              }
+            }
+          } catch {
+            // Non-blocking
+          }
         }
       } catch {
         if (isMounted) {
@@ -80,6 +200,15 @@ function App() {
       clearInterval(interval);
     };
   }, [apiUrl]);
+
+  // Persist hazards to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pothole_hazards_list', JSON.stringify(hazards));
+    } catch (err) {
+      console.warn('Could not persist hazards', err);
+    }
+  }, [hazards]);
 
   // Save history to localStorage
   useEffect(() => {
@@ -142,6 +271,62 @@ function App() {
     showToast('Saved to scan history!', 'success');
   }, [showToast]);
 
+  // Automated Geotagged Pothole Logging (Called when a pothole is detected during live camera or upload)
+  const handleAutoLogHazard = useCallback((detectionData) => {
+    if (!detectionData || detectionData.total_detections === 0) return;
+
+    const gps = detectionData.gps || currentGps;
+    const isCritical = (detectionData.total_detections || 0) >= 3;
+    const topConfidence = detectionData.detections?.[0]?.confidence || 92;
+
+    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const newHazard = {
+      id: `PTH-${randomSuffix}`,
+      title: gps.address || `Pothole at ${gps.lat.toFixed(4)}°N, ${gps.lng.toFixed(4)}°W`,
+      lat: gps.lat,
+      lng: gps.lng,
+      severity: isCritical ? 'critical' : 'moderate',
+      detectedTime: 'Just now',
+      coordsText: `${gps.lat.toFixed(4)}° N, ${gps.lng.toFixed(4)}° W`,
+      confidence: `${typeof topConfidence === 'number' && topConfidence <= 1 ? Math.round(topConfidence * 100) : topConfidence}%`,
+      image: detectionData.annotated
+        ? `data:image/jpeg;base64,${detectionData.annotated}`
+        : 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    // Add to hazards list
+    setHazards((prev) => [newHazard, ...prev.filter((h) => h.id !== newHazard.id)]);
+
+    // Also auto-append to scan history
+    setHistory((prev) => [
+      {
+        ...detectionData,
+        timestamp: `${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+        analysisTime: '0.12',
+      },
+      ...prev,
+    ]);
+
+    // Send to backend API if online
+    if (isApiOnline && apiUrl) {
+      try {
+        const clean = apiUrl.replace(/\/+$/, '');
+        fetch(`${clean}/api/hazards`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+          body: JSON.stringify(newHazard),
+        }).catch(() => {});
+      } catch {
+        // Non-blocking
+      }
+    }
+  }, [currentGps, isApiOnline, apiUrl]);
+
   const handleClearHistory = useCallback(() => {
     setHistory([]);
     localStorage.removeItem('pothole_scan_history');
@@ -178,10 +363,17 @@ function App() {
         {currentView === 'scan' && (
           <ScanView
             onDetectionComplete={handleDetectionComplete}
+            onAutoLogHazard={handleAutoLogHazard}
             isLoading={isLoading}
             setIsLoading={setIsLoading}
             apiUrl={apiUrl}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            currentGps={currentGps}
+            isGpsTracking={isGpsTracking}
+            isSimulating={isSimulating}
+            onStartGps={startGpsTracking}
+            onStopGps={stopGpsTracking}
+            onToggleSimulation={toggleSimulation}
             showToast={showToast}
           />
         )}
@@ -208,12 +400,22 @@ function App() {
           <HistoryView
             history={history}
             onClearHistory={handleClearHistory}
+            onNavigateToMap={() => handleNavigate('map')}
             showToast={showToast}
           />
         )}
 
         {currentView === 'map' && (
-          <MapView showToast={showToast} />
+          <MapView
+            hazards={hazards}
+            currentGps={currentGps}
+            isGpsTracking={isGpsTracking}
+            isSimulating={isSimulating}
+            onStartGps={startGpsTracking}
+            onStopGps={stopGpsTracking}
+            onToggleSimulation={toggleSimulation}
+            showToast={showToast}
+          />
         )}
 
         {currentView === 'login' && (

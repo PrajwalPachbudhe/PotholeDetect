@@ -8,16 +8,43 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
 
   if (!results) return null;
 
-  const { original, annotated, detections = [], total_detections = 0, image_size = { width: 0, height: 0 } } = results;
+  const {
+    original,
+    annotated,
+    detections = [],
+    total_detections = 0,
+    image_size = { width: 0, height: 0 },
+    gps = null,
+  } = results;
 
-  const avgConfidence = total_detections > 0
-    ? (detections.reduce((sum, d) => sum + (parseFloat(d.confidence) || 0), 0) / total_detections).toFixed(1)
-    : 0;
+  const avgConfidence =
+    total_detections > 0
+      ? (
+          detections.reduce((sum, d) => sum + (parseFloat(d.confidence) || 0), 0) / total_detections
+        ).toFixed(1)
+      : 0;
 
   const getSeverity = (count) => {
-    if (count >= 3) return { label: 'Critical Hazard', color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/30', badge: 'bg-red-500' };
-    if (count >= 1) return { label: 'Moderate Hazard', color: 'text-amber-400', bg: 'bg-amber-500/15 border-amber-500/30', badge: 'bg-amber-500' };
-    return { label: 'Pavement Clear', color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/30', badge: 'bg-emerald-500' };
+    if (count >= 3)
+      return {
+        label: 'Critical Hazard',
+        color: 'text-red-400',
+        bg: 'bg-red-500/15 border-red-500/30',
+        badge: 'bg-red-500',
+      };
+    if (count >= 1)
+      return {
+        label: 'Moderate Hazard',
+        color: 'text-amber-400',
+        bg: 'bg-amber-500/15 border-amber-500/30',
+        badge: 'bg-amber-500',
+      };
+    return {
+      label: 'Pavement Clear',
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-500/15 border-emerald-500/30',
+      badge: 'bg-emerald-500',
+    };
   };
 
   const severity = getSeverity(total_detections);
@@ -36,6 +63,16 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
     setIsSaved(true);
   };
 
+  const handleOpenGoogleMaps = () => {
+    if (gps?.lat && gps?.lng) {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${gps.lat},${gps.lng}`;
+      window.open(url, '_blank');
+      showToast?.('Opening Google Maps route...', 'info');
+    } else {
+      showToast?.('No GPS coordinates attached to this scan', 'error');
+    }
+  };
+
   return (
     <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-6 flex flex-col gap-6 animate-in fade-in duration-300">
       {/* Top Action & Status Bar */}
@@ -52,12 +89,16 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
               <h1 className="text-xl md:text-2xl font-bold text-slate-100 font-heading">
                 AI Detection Inspection
               </h1>
-              <span className={`px-3 py-0.5 rounded-full text-xs font-bold font-mono border ${severity.bg} ${severity.color}`}>
+              <span
+                className={`px-3 py-0.5 rounded-full text-xs font-bold font-mono border ${severity.bg} ${severity.color}`}
+              >
                 {severity.label}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Inference finished in <strong className="text-amber-400 font-mono">{analysisTime || '0.12'}s</strong> • {total_detections} hazard{total_detections === 1 ? '' : 's'} identified
+              Inference finished in{' '}
+              <strong className="text-amber-400 font-mono">{analysisTime || '0.12'}s</strong> •{' '}
+              {total_detections} hazard{total_detections === 1 ? '' : 's'} identified
             </p>
           </div>
         </div>
@@ -87,6 +128,49 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
         </div>
       </div>
 
+      {/* GPS Location & Road Status Banner */}
+      {gps && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              <span className="material-symbols-outlined text-xl">satellite_alt</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-cyan-400 uppercase">
+                  GPS GEOTAG ATTACHED
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {gps.lat?.toFixed(5)}°N, {gps.lng?.toFixed(5)}°W
+                </span>
+              </div>
+              <p className="text-sm font-bold text-slate-200 mt-0.5">
+                {gps.address || 'Surveyed Road Corridor'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleOpenGoogleMaps}
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+            >
+              <span className="material-symbols-outlined text-base text-blue-400">directions</span>
+              Google Maps
+            </button>
+            {onNavigateToMap && (
+              <button
+                onClick={onNavigateToMap}
+                className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md"
+              >
+                <span className="material-symbols-outlined text-base">traffic</span>
+                View Road Traffic Map
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main Inspection Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Interactive Before/After Comparison */}
@@ -114,7 +198,9 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
               {/* Annotated Image Layer (Foreground Clipped) */}
               <div
                 className="absolute inset-0 overflow-hidden"
-                style={{ clipPath: `polygon(${sliderPosition}% 0, 100% 0, 100% 100%, ${sliderPosition}% 100%)` }}
+                style={{
+                  clipPath: `polygon(${sliderPosition}% 0, 100% 0, 100% 100%, ${sliderPosition}% 100%)`,
+                }}
               >
                 <img
                   src={`data:image/jpeg;base64,${annotated}`}
@@ -154,7 +240,9 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
 
             {/* Sub-image Info Strip */}
             <div className="flex items-center justify-between text-xs font-mono text-slate-400 pt-1">
-              <span>Resolution: {image_size.width} × {image_size.height}px</span>
+              <span>
+                Resolution: {image_size.width} × {image_size.height}px
+              </span>
               <span>Inference Device: PyTorch CUDA / CPU</span>
             </div>
           </div>
@@ -168,7 +256,9 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
                 Hazard Metrics
               </span>
-              <span className="text-xs font-mono text-amber-400 font-bold">{avgConfidence}% Avg Conf</span>
+              <span className="text-xs font-mono text-amber-400 font-bold">
+                {avgConfidence}% Avg Conf
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -210,7 +300,7 @@ export default function ResultsView({ results, analysisTime, onBack, onSaveToHis
               <span className="text-[10px] text-slate-500">Bounding boxes</span>
             </div>
 
-            <div className="flex flex-col gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2.5 max-h-[260px] overflow-y-auto pr-1">
               {detections.length > 0 ? (
                 detections.map((det, idx) => (
                   <div

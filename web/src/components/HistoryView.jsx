@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function HistoryView({ history = [], onInspectItem, onClearHistory, showToast }) {
+export default function HistoryView({ history = [], onInspectItem, onClearHistory, onNavigateToMap, showToast }) {
   const [filter, setFilter] = useState('all'); // 'all' | 'critical' | 'moderate' | 'safe'
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalItem, setActiveModalItem] = useState(null);
@@ -8,19 +8,29 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
   const totalDetections = history.reduce((sum, item) => sum + (item.total_detections || 0), 0);
 
   const getSeverity = (count) => {
-    if (count >= 3) return { label: 'Critical', color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/30' };
-    if (count >= 1) return { label: 'Moderate', color: 'text-amber-400', bg: 'bg-amber-500/15 border-amber-500/30' };
+    if (count >= 3)
+      return { label: 'Critical', color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/30' };
+    if (count >= 1)
+      return { label: 'Moderate', color: 'text-amber-400', bg: 'bg-amber-500/15 border-amber-500/30' };
     return { label: 'Safe', color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/30' };
   };
 
   const filteredHistory = history.filter((item) => {
-    const sev = (item.total_detections || 0) >= 3 ? 'critical' : (item.total_detections || 0) >= 1 ? 'moderate' : 'safe';
+    const sev =
+      (item.total_detections || 0) >= 3
+        ? 'critical'
+        : (item.total_detections || 0) >= 1
+        ? 'moderate'
+        : 'safe';
     if (filter !== 'all' && sev !== filter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchTimestamp = item.timestamp?.toLowerCase().includes(q);
-      const matchDetections = item.detections?.some(d => (d.name || d.class || '').toLowerCase().includes(q));
-      return matchTimestamp || matchDetections;
+      const matchAddress = item.gps?.address?.toLowerCase().includes(q);
+      const matchDetections = item.detections?.some((d) =>
+        (d.name || d.class || '').toLowerCase().includes(q)
+      );
+      return matchTimestamp || matchAddress || matchDetections;
     }
     return true;
   });
@@ -38,7 +48,7 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
               Road Hazard Audit Log
             </h1>
             <p className="text-xs md:text-sm text-slate-400">
-              Persistent archive of captured scans, timestamps, and AI inference metadata
+              Persistent archive of captured scans, GPS locations, and road traffic alerts
             </p>
           </div>
         </div>
@@ -62,21 +72,35 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
       {/* Metric Summary Strips */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
-          <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Total Scans Recorded</span>
-          <span className="text-3xl font-extrabold text-slate-100 font-heading mt-2">{history.length}</span>
+          <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
+            Total Scans Recorded
+          </span>
+          <span className="text-3xl font-extrabold text-slate-100 font-heading mt-2">
+            {history.length}
+          </span>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
-          <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Total Identified Hazards</span>
-          <span className="text-3xl font-extrabold text-amber-400 font-heading mt-2">{totalDetections}</span>
+          <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
+            Total Identified Hazards
+          </span>
+          <span className="text-3xl font-extrabold text-amber-400 font-heading mt-2">
+            {totalDetections}
+          </span>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
-          <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Average Processing Time</span>
+          <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
+            Average Processing Time
+          </span>
           <span className="text-3xl font-extrabold text-cyan-400 font-heading mt-2">
             {history.length > 0
-              ? (history.reduce((sum, h) => sum + parseFloat(h.analysisTime || 0.1), 0) / history.length).toFixed(2)
-              : '0.00'}s
+              ? (
+                  history.reduce((sum, h) => sum + parseFloat(h.analysisTime || 0.1), 0) /
+                  history.length
+                ).toFixed(2)
+              : '0.00'}
+            s
           </span>
         </div>
       </div>
@@ -102,7 +126,7 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
         <div className="relative w-full sm:w-64">
           <input
             type="text"
-            placeholder="Search by date or class..."
+            placeholder="Search by date, street, class..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 outline-none transition-colors"
@@ -139,7 +163,7 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
                 {/* Thumbnail */}
                 <div className="w-24 h-24 rounded-xl overflow-hidden bg-black flex-shrink-0 relative border border-slate-800">
                   <img
-                    src={`data:image/jpeg;base64,${item.annotated}`}
+                    src={`data:image/jpeg;base64,${item.annotated || item.original}`}
                     alt={`Scan ${idx + 1}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -149,13 +173,20 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
                 {/* Details */}
                 <div className="flex-1 flex flex-col justify-between min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="truncate">
                       <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-amber-400 transition-colors">
                         Audit #{history.length - idx}
                       </h4>
                       <p className="text-[11px] font-mono text-slate-400 mt-0.5">{item.timestamp}</p>
+                      {item.gps?.address && (
+                        <p className="text-[10px] font-mono text-cyan-400 truncate mt-0.5">
+                          📍 {item.gps.address}
+                        </p>
+                      )}
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${sev.bg} ${sev.color}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${sev.bg} ${sev.color} flex-shrink-0`}
+                    >
                       {sev.label}
                     </span>
                   </div>
@@ -165,7 +196,9 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
                       <span className="material-symbols-outlined text-sm">warning</span>
                       {item.total_detections} hazard{item.total_detections === 1 ? '' : 's'}
                     </span>
-                    <span className="text-[11px] text-slate-500">{item.analysisTime || '0.12'}s</span>
+                    <span className="text-[11px] text-slate-500">
+                      {item.analysisTime || '0.12'}s
+                    </span>
                   </div>
                 </div>
               </div>
@@ -201,20 +234,50 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
 
             <div className="rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video relative">
               <img
-                src={`data:image/jpeg;base64,${activeModalItem.annotated}`}
+                src={`data:image/jpeg;base64,${activeModalItem.annotated || activeModalItem.original}`}
                 alt="Audit annotated capture"
                 className="w-full h-full object-contain"
               />
             </div>
 
+            {activeModalItem.gps && (
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-mono uppercase">
+                    GPS Geotag Location
+                  </span>
+                  <p className="text-xs font-bold text-cyan-400 mt-0.5">
+                    {activeModalItem.gps.address ||
+                      `${activeModalItem.gps.lat?.toFixed(5)}°N, ${activeModalItem.gps.lng?.toFixed(5)}°W`}
+                  </p>
+                </div>
+                {onNavigateToMap && (
+                  <button
+                    onClick={() => {
+                      setActiveModalItem(null);
+                      onNavigateToMap();
+                    }}
+                    className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1 shadow"
+                  >
+                    <span className="material-symbols-outlined text-sm">map</span>
+                    View on Map
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
                 <span className="text-[10px] text-slate-400 font-mono">Detections</span>
-                <span className="text-xl font-bold text-amber-400">{activeModalItem.total_detections}</span>
+                <span className="text-xl font-bold text-amber-400">
+                  {activeModalItem.total_detections}
+                </span>
               </div>
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
                 <span className="text-[10px] text-slate-400 font-mono">Analysis Time</span>
-                <span className="text-xl font-bold text-cyan-400">{activeModalItem.analysisTime}s</span>
+                <span className="text-xl font-bold text-cyan-400">
+                  {activeModalItem.analysisTime}s
+                </span>
               </div>
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
                 <span className="text-[10px] text-slate-400 font-mono">Dimensions</span>
@@ -231,10 +294,19 @@ export default function HistoryView({ history = [], onInspectItem, onClearHistor
                 </span>
                 <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto">
                   {activeModalItem.detections.map((d, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-slate-950 rounded-lg text-xs font-mono">
-                      <span className="text-amber-400 font-bold uppercase">{d.name || d.class || 'Pothole'}</span>
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-2 bg-slate-950 rounded-lg text-xs font-mono"
+                    >
+                      <span className="text-amber-400 font-bold uppercase">
+                        {d.name || d.class || 'Pothole'}
+                      </span>
                       <span className="text-slate-400">Conf: {d.confidence}%</span>
-                      {d.bbox && <span className="text-slate-500">[{d.bbox.x1},{d.bbox.y1},{d.bbox.x2},{d.bbox.y2}]</span>}
+                      {d.bbox && (
+                        <span className="text-slate-500">
+                          [{d.bbox.x1},{d.bbox.y1},{d.bbox.x2},{d.bbox.y2}]
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
