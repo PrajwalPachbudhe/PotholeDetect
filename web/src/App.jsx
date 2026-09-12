@@ -10,11 +10,12 @@ import MapView from './components/MapView';
 import LoginView from './components/LoginView';
 import SignupView from './components/SignupView';
 import ForgotPasswordView from './components/ForgotPasswordView';
-import SettingsModal from './components/SettingsModal';
 import Toast from './components/Toast';
 import ClickSpark from './components/ClickSpark';
 import { useGeolocation } from './utils/useGeolocation';
 import { getDistanceMeters } from './utils/clusterHazards';
+
+const FIXED_API_URL = 'https://oversleep-relic-stubbed.ngrok-free.dev';
 
 const DEFAULT_HAZARDS = [
   {
@@ -111,12 +112,9 @@ function App() {
     }
   });
 
-  // API Backend URL state
-  const [apiUrl, setApiUrl] = useState(() => {
-    return localStorage.getItem('pothole_api_url') || 'http://localhost:5000';
-  });
+  // Hardcoded production AI Backend URL
+  const apiUrl = FIXED_API_URL;
   const [isApiOnline, setIsApiOnline] = useState(true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Auth state
   const [user, setUser] = useState({
@@ -376,7 +374,6 @@ function App() {
           onLogout={handleLogout}
           currentView={currentView === 'results' ? 'scan' : currentView}
           onNavigate={handleNavigate}
-          onOpenSettings={() => setIsSettingsOpen(true)}
           isApiOnline={isApiOnline}
           apiUrl={apiUrl}
         />
@@ -388,7 +385,6 @@ function App() {
             isLoading={isLoading}
             setIsLoading={setIsLoading}
             apiUrl={apiUrl}
-            onOpenSettings={() => setIsSettingsOpen(true)}
             currentGps={currentGps}
             isGpsTracking={isGpsTracking}
             isSimulating={isSimulating}
@@ -481,15 +477,6 @@ function App() {
           user={user}
           currentView={currentView === 'results' ? 'scan' : currentView}
           onNavigate={handleNavigate}
-        />
-
-        {/* Global System & Backend Endpoint Config Modal */}
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          apiUrl={apiUrl}
-          setApiUrl={setApiUrl}
-          showToast={showToast}
         />
       </div>
     </ClickSpark>

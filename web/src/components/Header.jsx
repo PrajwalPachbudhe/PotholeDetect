@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Header({ user, onLogout, currentView, onNavigate, onOpenSettings, isApiOnline, apiUrl }) {
+export default function Header({ user, onLogout, currentView, onNavigate, isApiOnline, apiUrl }) {
   const [showMenu, setShowMenu] = useState(false);
 
   const navItems = [
@@ -61,33 +61,23 @@ export default function Header({ user, onLogout, currentView, onNavigate, onOpen
         })}
       </nav>
 
-      {/* Right Controls: API Status Pill, Settings, User Profile */}
+      {/* Right Controls: Automatic AI Edge Status & User Profile */}
       <div className="flex items-center gap-3">
         {/* Live Backend Connection Status Pill */}
-        <button
-          onClick={onOpenSettings}
-          title="Click to configure API URL & connection"
-          className="hidden sm:flex items-center gap-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 rounded-xl px-3 py-1.5 transition-all text-left"
+        <div
+          title="AI Inference Cloud Edge Connection"
+          className="hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 transition-all text-left"
         >
           <span className={`w-2 h-2 rounded-full ${isApiOnline ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
           <div className="flex flex-col">
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 leading-none">
-              API {isApiOnline ? 'ONLINE' : 'CHECK'}
+              AI EDGE {isApiOnline ? 'LIVE' : 'CHECK'}
             </span>
-            <span className="text-[11px] font-mono text-slate-200 font-bold leading-none truncate max-w-[100px]">
-              {apiUrl ? apiUrl.replace(/^https?:\/\//, '') : 'localhost:5000'}
+            <span className="text-[11px] font-mono text-cyan-400 font-bold leading-none truncate max-w-[120px]">
+              YOLOv8 Connected
             </span>
           </div>
-        </button>
-
-        {/* Settings Button */}
-        <button
-          onClick={onOpenSettings}
-          title="Settings & Config"
-          className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 text-slate-300 flex items-center justify-center transition-colors"
-        >
-          <span className="material-symbols-outlined text-lg">tune</span>
-        </button>
+        </div>
 
         {/* User Profile / Auth */}
         {user ? (

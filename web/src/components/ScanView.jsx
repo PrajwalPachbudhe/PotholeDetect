@@ -10,7 +10,6 @@ export default function ScanView({
   isLoading,
   setIsLoading,
   apiUrl,
-  onOpenSettings,
   currentGps,
   isGpsTracking,
   isSimulating,
@@ -870,13 +869,10 @@ export default function ScanView({
         </div>
 
         <div className="flex flex-col">
-          <span className="text-[9px] font-mono uppercase text-slate-400">Target Server</span>
-          <button
-            onClick={onOpenSettings}
-            className="text-xs font-mono text-cyan-400 hover:underline truncate text-left"
-          >
-            {apiUrl || 'http://localhost:5000'}
-          </button>
+          <span className="text-[9px] font-mono uppercase text-slate-400">AI Edge Node</span>
+          <span className="text-xs font-mono text-cyan-400 font-bold truncate text-left">
+            YOLOv8 Cloud Tunnel
+          </span>
         </div>
 
         <div className="flex flex-col">
