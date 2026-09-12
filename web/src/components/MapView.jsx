@@ -27,115 +27,6 @@ const TILE_LAYERS = {
   },
 };
 
-// Base road network corridors for Google Maps traffic-style representation
-export const BASE_ROAD_NETWORK = [
-  {
-    id: 'road-main-st',
-    name: 'Main Street Corridor',
-    status: 'danger',
-    potholeCount: 3,
-    avgSpeed: '18 km/h (Slow - Road Damage)',
-    coordinates: [
-      [34.0505, -118.2415],
-      [34.0522, -118.2437],
-      [34.0531, -118.2465],
-      [34.0545, -118.2490],
-      [34.0560, -118.2515],
-    ],
-  },
-  {
-    id: 'road-grand-ave',
-    name: 'Grand Avenue Arterial',
-    status: 'danger',
-    potholeCount: 2,
-    avgSpeed: '22 km/h (Pothole Congestion)',
-    coordinates: [
-      [34.0530, -118.2560],
-      [34.0545, -118.2520],
-      [34.0558, -118.2485],
-      [34.0575, -118.2450],
-    ],
-  },
-  {
-    id: 'road-broadway',
-    name: 'Broadway Boulevard',
-    status: 'warning',
-    potholeCount: 1,
-    avgSpeed: '36 km/h (Moderate Caution)',
-    coordinates: [
-      [34.0450, -118.2520],
-      [34.0485, -118.2495],
-      [34.0510, -118.2475],
-      [34.0535, -118.2455],
-    ],
-  },
-  {
-    id: 'road-wilshire',
-    name: 'Wilshire Boulevard Express',
-    status: 'warning',
-    potholeCount: 1,
-    avgSpeed: '32 km/h (Surface Distress)',
-    coordinates: [
-      [34.0498, -118.2630],
-      [34.0498, -118.2580],
-      [34.0500, -118.2530],
-      [34.0502, -118.2480],
-    ],
-  },
-  {
-    id: 'road-sunset-hwy',
-    name: 'Sunset Highway Express',
-    status: 'danger',
-    potholeCount: 2,
-    avgSpeed: '25 km/h (Deep Craters)',
-    coordinates: [
-      [34.0590, -118.2480],
-      [34.0570, -118.2400],
-      [34.0555, -118.2350],
-      [34.0540, -118.2300],
-    ],
-  },
-  {
-    id: 'road-figueroa-north',
-    name: 'North Figueroa Safe Corridor',
-    status: 'clear',
-    potholeCount: 0,
-    avgSpeed: '55 km/h (Clear & Smooth)',
-    coordinates: [
-      [34.0580, -118.2550],
-      [34.0560, -118.2580],
-      [34.0530, -118.2610],
-      [34.0500, -118.2640],
-    ],
-  },
-  {
-    id: 'road-olympic-clear',
-    name: 'Olympic Expressway (Eastbound)',
-    status: 'clear',
-    potholeCount: 0,
-    avgSpeed: '60 km/h (Optimal Condition)',
-    coordinates: [
-      [34.0420, -118.2650],
-      [34.0420, -118.2550],
-      [34.0420, -118.2450],
-      [34.0420, -118.2380],
-    ],
-  },
-  {
-    id: 'road-spring-clear',
-    name: 'Spring Street Bypass',
-    status: 'clear',
-    potholeCount: 0,
-    avgSpeed: '48 km/h (Pavement Inspected)',
-    coordinates: [
-      [34.0470, -118.2450],
-      [34.0490, -118.2430],
-      [34.0510, -118.2410],
-      [34.0530, -118.2390],
-    ],
-  },
-];
-
 export default function MapView({
   hazards = [],
   currentGps,
@@ -152,16 +43,17 @@ export default function MapView({
   const markersLayerRef = useRef(L.layerGroup());
   const roadTrafficLayerRef = useRef(L.layerGroup());
   const vehicleMarkerRef = useRef(null);
+  const gpsPathCoordsRef = useRef([]);
+  const gpsPathPolylineRef = useRef(null);
 
   const [selectedHazard, setSelectedHazard] = useState(null);
-  const [selectedRoad, setSelectedRoad] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [mapStyle, setMapStyle] = useState('dark');
   const [showTrafficLayer, setShowTrafficLayer] = useState(true);
   const [showMarkers, setShowMarkers] = useState(true);
-  const [followVehicle, setFollowVehicle] = useState(false);
+  const [followVehicle, setFollowVehicle] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [geoResults, setGeoResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -176,47 +68,25 @@ export default function MapView({
     }
   }, [activeHazardsList, selectedHazard]);
 
-  // Combine roads with detected hazards
-  const roadNetwork = useMemo(() => {
-    const roads = [...BASE_ROAD_NETWORK];
-
-    activeHazardsList.forEach((hazard) => {
-      const isAlreadyCovered = roads.some((r) =>
-        r.coordinates.some(
-          (c) => Math.abs(c[0] - hazard.lat) < 0.0006 && Math.abs(c[1] - hazard.lng) < 0.0006
-        )
-      );
-
-      if (!isAlreadyCovered && hazard.lat && hazard.lng) {
-        roads.push({
-          id: `dynamic-road-${hazard.id}`,
-          name: hazard.title || `Road Corridor at ${hazard.coordsText || 'GPS Point'}`,
-          status: hazard.severity === 'critical' ? 'danger' : 'warning',
-          potholeCount: 1,
-          avgSpeed: hazard.severity === 'critical' ? '15 km/h (Severe Defect)' : '30 km/h (Caution)',
-          coordinates: [
-            [hazard.lat - 0.0012, hazard.lng - 0.0008],
-            [hazard.lat, hazard.lng],
-            [hazard.lat + 0.0012, hazard.lng + 0.0008],
-          ],
-        });
-      }
-    });
-
-    return roads;
-  }, [activeHazardsList]);
+  // Determine initial center: prefer current user GPS or latest detected pothole
+  const initialCenter = useMemo(() => {
+    if (currentGps?.lat && currentGps?.lng) {
+      return [currentGps.lat, currentGps.lng];
+    }
+    if (activeHazardsList.length > 0 && activeHazardsList[0].lat && activeHazardsList[0].lng) {
+      return [activeHazardsList[0].lat, activeHazardsList[0].lng];
+    }
+    return [34.0515, -118.2480];
+  }, [currentGps, activeHazardsList]);
 
   // Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    const initialLat = currentGps?.lat || 34.0515;
-    const initialLng = currentGps?.lng || -118.2480;
-
     const map = L.map(mapContainerRef.current, {
-      center: [initialLat, initialLng],
-      zoom: 14,
+      center: initialCenter,
+      zoom: 16,
       zoomControl: false,
     });
 
@@ -235,10 +105,10 @@ export default function MapView({
 
     mapInstanceRef.current = map;
 
-    // Trigger multiple resize invalidations to ensure smooth rendering
-    const t1 = setTimeout(() => map.invalidateSize(), 80);
-    const t2 = setTimeout(() => map.invalidateSize(), 300);
-    const t3 = setTimeout(() => map.invalidateSize(), 700);
+    // Trigger multiple resize invalidations to guarantee full render
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 350);
+    const t3 = setTimeout(() => map.invalidateSize(), 800);
 
     const handleResize = () => map.invalidateSize();
     window.addEventListener('resize', handleResize);
@@ -255,125 +125,20 @@ export default function MapView({
     };
   }, []);
 
-  // Update Base Tile
+  // Update Base Tile Style
   useEffect(() => {
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
     const layerConfig = TILE_LAYERS[mapStyle] || TILE_LAYERS.dark;
     tileLayerRef.current.setUrl(layerConfig.url);
   }, [mapStyle]);
 
-  // Render Google Maps Traffic Lines
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    roadTrafficLayerRef.current.clearLayers();
-
-    if (!showTrafficLayer) return;
-
-    roadNetwork.forEach((road) => {
-      let strokeColor = '#10b981';
-      let casingColor = '#064e3b';
-      let glowClass = '';
-
-      if (road.status === 'danger') {
-        strokeColor = '#ef4444';
-        casingColor = '#7f1d1d';
-        glowClass = 'traffic-danger-line';
-      } else if (road.status === 'warning') {
-        strokeColor = '#f59e0b';
-        casingColor = '#78350f';
-        glowClass = 'traffic-warning-line';
-      }
-
-      // Outer Casing / Border
-      const casing = L.polyline(road.coordinates, {
-        color: casingColor,
-        weight: 10,
-        opacity: 0.85,
-        lineCap: 'round',
-        lineJoin: 'round',
-      }).addTo(roadTrafficLayerRef.current);
-
-      // Inner Vivid Traffic Color
-      const innerLine = L.polyline(road.coordinates, {
-        color: strokeColor,
-        weight: 6,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round',
-        className: glowClass,
-      }).addTo(roadTrafficLayerRef.current);
-
-      const roadTooltip = `
-        <div class="p-2 font-body text-slate-100 min-w-[180px]">
-          <div class="flex items-center gap-1.5 mb-1">
-            <span class="w-2.5 h-2.5 rounded-full ${
-              road.status === 'danger'
-                ? 'bg-red-500'
-                : road.status === 'warning'
-                ? 'bg-amber-500'
-                : 'bg-emerald-500'
-            }"></span>
-            <span class="text-xs font-bold font-heading">${road.name}</span>
-          </div>
-          <div class="text-[11px] font-mono text-slate-300">
-            Road Status: <strong class="${
-              road.status === 'danger'
-                ? 'text-red-400'
-                : road.status === 'warning'
-                ? 'text-amber-400'
-                : 'text-emerald-400'
-            }">${road.status.toUpperCase()}</strong>
-          </div>
-          <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-            Avg Speed: ${road.avgSpeed}
-          </div>
-          <div class="text-[10px] text-amber-400 font-mono mt-0.5">
-            Potholes Identified: ${road.potholeCount}
-          </div>
-        </div>
-      `;
-
-      innerLine.bindTooltip(roadTooltip, {
-        sticky: true,
-        className: 'google-maps-traffic-tooltip',
-      });
-
-      innerLine.on('click', () => setSelectedRoad(road));
-      casing.on('click', () => setSelectedRoad(road));
-
-      // Incident Badge on hazardous road midpoint
-      if (road.status === 'danger' || road.status === 'warning') {
-        const midCoord = road.coordinates[Math.floor(road.coordinates.length / 2)];
-        const incidentIcon = L.divIcon({
-          html: `
-            <div class="relative flex items-center justify-center animate-bounce">
-              <div class="w-6 h-6 rounded-full ${
-                road.status === 'danger'
-                  ? 'bg-red-600 border-2 border-slate-950 text-white shadow-[0_0_12px_rgba(239,68,68,0.9)]'
-                  : 'bg-amber-500 border-2 border-slate-950 text-slate-950 shadow-[0_0_12px_rgba(245,158,11,0.9)]'
-              } flex items-center justify-center font-bold text-[11px]">
-                <span class="material-symbols-outlined text-[13px]">${
-                  road.status === 'danger' ? 'report' : 'warning'
-                }</span>
-              </div>
-            </div>
-          `,
-          className: 'custom-incident-badge',
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
-        });
-
-        L.marker(midCoord, { icon: incidentIcon }).addTo(roadTrafficLayerRef.current);
-      }
-    });
-  }, [roadNetwork, showTrafficLayer]);
-
-  // Render Pothole Markers
+  // Render Pothole Spot Indicators (Precise localized road defect circles and Google Maps incident markers)
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
+    roadTrafficLayerRef.current.clearLayers();
 
-    if (!showMarkers) return;
+    if (!showMarkers && !showTrafficLayer) return;
 
     const filtered = activeHazardsList.filter((hazard) => {
       const q = searchQuery.trim().toLowerCase();
@@ -389,51 +154,97 @@ export default function MapView({
     filtered.forEach((hazard) => {
       const isCritical = hazard.severity === 'critical';
       const isSelected = selectedHazard?.id === hazard.id;
+      const spotColor = isCritical ? '#ef4444' : '#f59e0b';
 
-      const markerHtml = `
-        <div class="relative flex flex-col items-center cursor-pointer group ${
-          isSelected ? 'scale-125 z-40' : 'z-20'
-        } transition-transform">
-          <div class="absolute -bottom-1 w-6 h-2 rounded-full ${
-            isCritical
-              ? 'bg-red-500/80 shadow-[0_0_14px_rgba(239,68,68,0.9)]'
-              : 'bg-amber-500/80 shadow-[0_0_14px_rgba(245,158,11,0.9)]'
-          } blur-[3px]"></div>
-          <div class="w-8 h-8 rounded-full ${
-            isCritical
-              ? 'bg-[#111827] border-2 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
-              : 'bg-[#111827] border-2 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.6)]'
-          } flex items-center justify-center font-bold">
-            <span class="material-symbols-outlined text-[15px]">
-              ${isCritical ? 'crisis_alert' : 'warning'}
-            </span>
+      // 1. Precise Localized Pavement Defect Circle (tight 6m-10m radius right on the road surface)
+      if (showTrafficLayer) {
+        // Outer pulsing hazard ring
+        const outerCircle = L.circle([hazard.lat, hazard.lng], {
+          radius: isCritical ? 10 : 7,
+          color: spotColor,
+          fillColor: spotColor,
+          fillOpacity: 0.25,
+          weight: 2,
+          className: isCritical ? 'traffic-danger-line' : 'traffic-warning-line',
+        }).addTo(roadTrafficLayerRef.current);
+
+        // Inner solid core spot
+        const innerCircle = L.circle([hazard.lat, hazard.lng], {
+          radius: 3.5,
+          color: '#ffffff',
+          fillColor: spotColor,
+          fillOpacity: 0.9,
+          weight: 1.5,
+        }).addTo(roadTrafficLayerRef.current);
+
+        const spotTooltip = `
+          <div class="p-2 font-body text-slate-100 min-w-[160px]">
+            <div class="flex items-center gap-1.5 mb-0.5">
+              <span class="w-2.5 h-2.5 rounded-full ${isCritical ? 'bg-red-500' : 'bg-amber-500'}"></span>
+              <span class="text-xs font-bold font-heading">${hazard.title || 'Road Pothole'}</span>
+            </div>
+            <div class="text-[10px] text-slate-300 font-mono">
+              Severity: <strong class="${isCritical ? 'text-red-400' : 'text-amber-400'}">${hazard.severity.toUpperCase()}</strong>
+            </div>
+            <div class="text-[10px] text-cyan-400 font-mono mt-0.5">
+              ${hazard.coordsText || `${hazard.lat?.toFixed(5)}°N, ${hazard.lng?.toFixed(5)}°W`}
+            </div>
           </div>
-          <div class="w-1 h-2.5 ${isCritical ? 'bg-red-500' : 'bg-amber-500'} -mt-0.5"></div>
-        </div>
-      `;
+        `;
+        outerCircle.bindTooltip(spotTooltip, { sticky: true, className: 'google-maps-traffic-tooltip' });
+        innerCircle.on('click', () => {
+          setSelectedHazard(hazard);
+          setIsSheetOpen(true);
+        });
+      }
 
-      const customIcon = L.divIcon({
-        html: markerHtml,
-        className: 'custom-pothole-marker',
-        iconSize: [32, 42],
-        iconAnchor: [16, 42],
-      });
+      // 2. Google Maps Pothole Pin Marker directly over the spot
+      if (showMarkers) {
+        const markerHtml = `
+          <div class="relative flex flex-col items-center cursor-pointer group ${
+            isSelected ? 'scale-125 z-40' : 'z-20'
+          } transition-transform">
+            <div class="absolute -bottom-1 w-5 h-2 rounded-full ${
+              isCritical
+                ? 'bg-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.9)]'
+                : 'bg-amber-500/80 shadow-[0_0_12px_rgba(245,158,11,0.9)]'
+            } blur-[2px]"></div>
+            <div class="w-7 h-7 rounded-full ${
+              isCritical
+                ? 'bg-[#111827] border-2 border-red-500 text-red-400 shadow-[0_0_16px_rgba(239,68,68,0.7)]'
+                : 'bg-[#111827] border-2 border-amber-500 text-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.7)]'
+            } flex items-center justify-center font-bold">
+              <span class="material-symbols-outlined text-[13px]">
+                ${isCritical ? 'crisis_alert' : 'warning'}
+              </span>
+            </div>
+            <div class="w-0.5 h-2 ${isCritical ? 'bg-red-500' : 'bg-amber-500'}"></div>
+          </div>
+        `;
 
-      const marker = L.marker([hazard.lat, hazard.lng], { icon: customIcon }).addTo(
-        markersLayerRef.current
-      );
+        const customIcon = L.divIcon({
+          html: markerHtml,
+          className: 'custom-pothole-marker',
+          iconSize: [28, 36],
+          iconAnchor: [14, 36],
+        });
 
-      marker.on('click', () => {
-        setSelectedHazard(hazard);
-        setIsSheetOpen(true);
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([hazard.lat, hazard.lng], 16, { duration: 0.8 });
-        }
-      });
+        const marker = L.marker([hazard.lat, hazard.lng], { icon: customIcon }).addTo(
+          markersLayerRef.current
+        );
+
+        marker.on('click', () => {
+          setSelectedHazard(hazard);
+          setIsSheetOpen(true);
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([hazard.lat, hazard.lng], 17, { duration: 0.6 });
+          }
+        });
+      }
     });
-  }, [activeHazardsList, searchQuery, filterSeverity, selectedHazard, showMarkers]);
+  }, [activeHazardsList, searchQuery, filterSeverity, selectedHazard, showMarkers, showTrafficLayer]);
 
-  // Update Live GPS Vehicle Navigation Marker
+  // Update Live GPS Vehicle Navigation & Real-Time Travel Track
   useEffect(() => {
     if (!mapInstanceRef.current) return;
 
@@ -447,6 +258,30 @@ export default function MapView({
 
     const { lat, lng, heading = 0 } = currentGps;
 
+    // Track vehicle path breadcrumbs
+    const lastCoord = gpsPathCoordsRef.current[gpsPathCoordsRef.current.length - 1];
+    if (!lastCoord || Math.abs(lastCoord[0] - lat) > 0.00005 || Math.abs(lastCoord[1] - lng) > 0.00005) {
+      gpsPathCoordsRef.current.push([lat, lng]);
+      if (gpsPathCoordsRef.current.length > 50) {
+        gpsPathCoordsRef.current.shift();
+      }
+
+      if (gpsPathCoordsRef.current.length > 1) {
+        if (!gpsPathPolylineRef.current) {
+          gpsPathPolylineRef.current = L.polyline(gpsPathCoordsRef.current, {
+            color: '#3b82f6',
+            weight: 5,
+            opacity: 0.8,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(roadTrafficLayerRef.current);
+        } else {
+          gpsPathPolylineRef.current.setLatLngs(gpsPathCoordsRef.current);
+        }
+      }
+    }
+
+    // Google Maps Navigation Arrow / Puck
     const vehicleHtml = `
       <div class="relative flex items-center justify-center">
         <div class="absolute w-12 h-12 rounded-full bg-blue-500/25 animate-ping"></div>
@@ -483,7 +318,7 @@ export default function MapView({
     }
 
     if (followVehicle && mapInstanceRef.current) {
-      mapInstanceRef.current.panTo([lat, lng], { animate: true, duration: 0.5 });
+      mapInstanceRef.current.panTo([lat, lng], { animate: true, duration: 0.4 });
     }
   }, [currentGps, followVehicle]);
 
@@ -530,7 +365,7 @@ export default function MapView({
     setIsSheetOpen(true);
     setShowDropdown(false);
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([hazard.lat, hazard.lng], 16, { duration: 1 });
+      mapInstanceRef.current.flyTo([hazard.lat, hazard.lng], 17, { duration: 0.8 });
     }
     showToast?.(`Focused on ${hazard.title || hazard.id}`, 'info');
   };
@@ -545,12 +380,12 @@ export default function MapView({
 
   const handleRecenter = () => {
     if (currentGps?.lat && currentGps?.lng && mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([currentGps.lat, currentGps.lng], 16, { duration: 1 });
+      mapInstanceRef.current.flyTo([currentGps.lat, currentGps.lng], 17, { duration: 0.8 });
       setFollowVehicle(true);
       showToast?.('Centered on live vehicle GPS', 'info');
-    } else if (mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([34.0515, -118.2480], 14, { duration: 1 });
-      showToast?.('Centered on Downtown Road Corridors', 'info');
+    } else if (activeHazardsList.length > 0 && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([activeHazardsList[0].lat, activeHazardsList[0].lng], 17, { duration: 0.8 });
+      showToast?.('Centered on detected pothole', 'info');
     }
   };
 
@@ -668,12 +503,12 @@ export default function MapView({
 
         {/* Right Controls: Traffic Layer, Map Styles, GPS Controls */}
         <div className="pointer-events-auto flex flex-wrap items-center gap-2">
-          {/* Google Maps Traffic Layer Switcher */}
+          {/* Road Defect Indicator Toggle */}
           <button
             onClick={() => {
               setShowTrafficLayer(!showTrafficLayer);
               showToast?.(
-                showTrafficLayer ? 'Traffic flow layer hidden' : 'Google Maps traffic layer active',
+                showTrafficLayer ? 'Road defect hotspots hidden' : 'Road defect hotspots active',
                 'info'
               );
             }}
@@ -684,11 +519,11 @@ export default function MapView({
             }`}
           >
             <span className="material-symbols-outlined text-base">traffic</span>
-            <span>Traffic Flow</span>
+            <span>Road Hotspots</span>
             {showTrafficLayer && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
           </button>
 
-          {/* Map Layer Switcher: Dark, Satellite, Street */}
+          {/* Map Layer Switcher */}
           <div className="bg-[#111827]/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 flex items-center gap-1 shadow-2xl">
             {Object.keys(TILE_LAYERS).map((styleKey) => (
               <button
@@ -705,7 +540,7 @@ export default function MapView({
             ))}
           </div>
 
-          {/* GPS Simulation / Live GPS Tracker Button */}
+          {/* GPS Simulation / Live GPS Tracker */}
           <div className="bg-[#111827]/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 flex items-center gap-1 shadow-2xl">
             <button
               onClick={() => {
@@ -725,7 +560,7 @@ export default function MapView({
               title="Simulate driving car along road route"
             >
               <span className="material-symbols-outlined text-sm">directions_car</span>
-              {isSimulating ? 'Driving Simulation' : 'Simulate Drive'}
+              {isSimulating ? 'Simulating' : 'Simulate'}
             </button>
 
             <button
@@ -757,7 +592,7 @@ export default function MapView({
                 ? 'border-blue-500 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.3)]'
                 : 'border-slate-700/80 text-slate-300 hover:text-amber-400'
             }`}
-            title="Recenter Map & Follow Vehicle"
+            title="Recenter Map"
           >
             <span className="material-symbols-outlined text-xl">my_location</span>
           </button>
@@ -782,7 +617,7 @@ export default function MapView({
               </span>
             </div>
             <p className="text-xs font-bold text-slate-100 truncate mt-0.5">
-              {currentGps.address || 'Surveying Roadway...'}
+              {currentGps.address || 'Road Position'}
             </p>
             <p className="text-[10px] font-mono text-cyan-400 mt-0.5">
               {currentGps.lat?.toFixed(5)}°N, {currentGps.lng?.toFixed(5)}°W • Acc: ±{currentGps.accuracy || 5}m
@@ -791,20 +626,16 @@ export default function MapView({
         </div>
       )}
 
-      {/* Google Maps Road Traffic Legend */}
+      {/* Google Maps Road Pothole Legend */}
       <div className="absolute bottom-6 left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-800 rounded-2xl px-3.5 py-2 shadow-2xl flex items-center gap-3 hidden sm:flex">
-        <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Road Traffic / Hazards:</span>
+        <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Pothole Spots:</span>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[10px] font-mono text-slate-300">Clear</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+          <span className="text-[10px] font-mono text-slate-300">Moderate Pothole</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-1.5 rounded-full bg-amber-500" />
-          <span className="text-[10px] font-mono text-slate-300">Moderate Potholes</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-[10px] font-mono text-slate-300">Severe Road Defect</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-[10px] font-mono text-slate-300">Critical Crater</span>
         </div>
       </div>
 
@@ -841,7 +672,7 @@ export default function MapView({
                   <span className="text-xs font-mono text-slate-400">ID: {selectedHazard.id}</span>
                 </div>
                 <h2 className="font-heading text-xl font-bold text-slate-100">
-                  {selectedHazard.title || `Pothole at ${selectedHazard.coordsText || 'Survey Route'}`}
+                  {selectedHazard.title || `Pothole at ${selectedHazard.coordsText || 'GPS Point'}`}
                 </h2>
               </div>
               <button
@@ -893,11 +724,11 @@ export default function MapView({
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-amber-400 text-base">traffic</span>
                     <span className="text-xs text-slate-300 font-medium">
-                      Road Impact: High Traffic Slowdown & Hazard
+                      Pavement Defect Pinned on GPS Road
                     </span>
                   </div>
                   <span className="text-[11px] font-mono text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
-                    Red Alert
+                    Road Defect
                   </span>
                 </div>
               </div>
