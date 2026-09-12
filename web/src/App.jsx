@@ -374,6 +374,8 @@ function App() {
             onStartGps={startGpsTracking}
             onStopGps={stopGpsTracking}
             onToggleSimulation={toggleSimulation}
+            hazards={hazards}
+            onNavigateToMap={() => handleNavigate('map')}
             showToast={showToast}
           />
         )}
