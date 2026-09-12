@@ -61,6 +61,34 @@
   --shadow-glow-cyan: 0 0 35px rgba(6, 182, 212, 0.25);
 }
 
+/* Mobile & Android APK Native Optimizations */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background-color: #0a0e17;
+  color: #f8fafc;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior-y: none;
+}
+
+/* Hide scrollbars for clean app look */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Native App Touch targets */
+button, a, input, select {
+  touch-action: manipulation;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;

@@ -499,19 +499,19 @@ export default function ScanView({
   }, [liveBoxes, scanMode]);
 
   return (
-    <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-4 flex flex-col gap-4 animate-in fade-in duration-300">
+    <main className="flex-1 w-full max-w-6xl mx-auto px-2.5 sm:px-4 md:px-8 py-2.5 sm:py-4 flex flex-col gap-3 sm:gap-4 animate-in fade-in duration-300">
       {/* Top Banner / Mode Switcher */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-            <span className="material-symbols-outlined text-2xl">radar</span>
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 backdrop-blur-xl">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)] flex-shrink-0">
+            <span className="material-symbols-outlined text-xl sm:text-2xl">radar</span>
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-slate-100 font-heading">
+            <h1 className="text-base sm:text-lg md:text-xl font-bold text-slate-100 font-heading">
               Real-Time Road Hazard Dashcam
             </h1>
-            <p className="text-xs text-slate-400">
-              Autonomous GPS location tracking & live pothole pinning (hands-free)
+            <p className="text-[11px] sm:text-xs text-slate-400">
+              Autonomous GPS tracking & live pothole pinning
             </p>
           </div>
         </div>
@@ -520,35 +520,35 @@ export default function ScanView({
         <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1 w-full md:w-auto">
           <button
             onClick={() => setScanMode('camera')}
-            className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
               scanMode === 'camera'
                 ? 'bg-amber-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <span className="material-symbols-outlined text-base">videocam</span>
-            Live Dashcam HUD
+            <span className="material-symbols-outlined text-sm sm:text-base">videocam</span>
+            Live Dashcam
           </button>
           <button
             onClick={() => setScanMode('upload')}
-            className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
               scanMode === 'upload'
                 ? 'bg-amber-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <span className="material-symbols-outlined text-base">cloud_upload</span>
+            <span className="material-symbols-outlined text-sm sm:text-base">cloud_upload</span>
             Upload Photo
           </button>
         </div>
       </div>
 
       {/* Live GPS Telemetry Ribbon */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 sm:p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shadow-lg">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 flex-shrink-0">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
+              className={`w-2 h-2 rounded-full ${
                 isSimulating
                   ? 'bg-blue-400 animate-pulse'
                   : isGpsTracking
@@ -556,27 +556,27 @@ export default function ScanView({
                   : 'bg-amber-400'
               }`}
             />
-            <span className="text-xs font-mono font-bold text-slate-200">
-              {isSimulating ? '🚗 SIMULATING DRIVE' : isGpsTracking ? '📡 GPS TRACKING LIVE' : '📍 GPS READY'}
+            <span className="text-[10px] sm:text-xs font-mono font-bold text-slate-200">
+              {isSimulating ? '🚗 SIMULATING' : isGpsTracking ? '📡 GPS LIVE' : '📍 GPS READY'}
             </span>
           </div>
 
-          <div className="flex flex-col">
-            <span className="text-xs font-bold text-slate-100 flex items-center gap-1 truncate max-w-[260px]">
-              <span className="material-symbols-outlined text-sm text-cyan-400">location_on</span>
-              {currentGps?.address || 'Surveying Roadway'}
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-bold text-slate-100 flex items-center gap-1 truncate">
+              <span className="material-symbols-outlined text-xs text-cyan-400 flex-shrink-0">location_on</span>
+              <span className="truncate">{currentGps?.address || 'Surveying Roadway'}</span>
             </span>
-            <span className="text-[10px] font-mono text-slate-400">
-              {currentGps?.lat?.toFixed(5)}°N, {currentGps?.lng?.toFixed(5)}°W • {currentGps?.speed || 0} km/h • Head {currentGps?.heading || 0}°
+            <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+              {currentGps?.lat?.toFixed(4)}°N, {currentGps?.lng?.toFixed(4)}°W • {currentGps?.speed || 0} km/h • Head {currentGps?.heading || 0}°
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between sm:justify-end gap-1.5">
           {taggedPotholesCount > 0 && (
-            <div className="bg-red-500/20 border border-red-500/40 text-red-400 px-2.5 py-1 rounded-xl text-xs font-mono font-bold flex items-center gap-1 animate-pulse">
-              <span className="material-symbols-outlined text-sm">crisis_alert</span>
-              {taggedPotholesCount} Pothole{taggedPotholesCount === 1 ? '' : 's'} Logged
+            <div className="bg-red-500/20 border border-red-500/40 text-red-400 px-2 py-1 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1 animate-pulse">
+              <span className="material-symbols-outlined text-xs">crisis_alert</span>
+              {taggedPotholesCount} Logged
             </div>
           )}
 

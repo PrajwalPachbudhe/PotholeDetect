@@ -12,28 +12,28 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
   ];
 
   return (
-    <header className="bg-[#0a0e17]/95 backdrop-blur-xl w-full sticky top-0 z-40 border-b border-slate-800/80 px-4 md:px-8 h-16 flex items-center justify-between transition-all">
+    <header className="bg-[#0a0e17]/95 backdrop-blur-xl w-full sticky top-0 z-40 border-b border-slate-800/80 px-2.5 sm:px-4 md:px-8 h-14 sm:h-16 flex items-center justify-between transition-all select-none">
       {/* Brand & Logo */}
       <div 
         onClick={() => onNavigate('scan')} 
-        className="flex items-center gap-3 cursor-pointer group select-none"
+        className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
       >
-        <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform shadow-[0_0_15px_rgba(245,158,11,0.25)]">
-          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform shadow-[0_0_15px_rgba(245,158,11,0.25)] flex-shrink-0">
+          <span className="material-symbols-outlined text-lg sm:text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
             crisis_alert
           </span>
         </div>
         <div className="flex flex-col">
-          <div className="flex items-center gap-1.5">
-            <span className="font-heading font-extrabold text-base tracking-tight text-slate-100 group-hover:text-amber-400 transition-colors">
+          <div className="flex items-center gap-1">
+            <span className="font-heading font-extrabold text-sm sm:text-base tracking-tight text-slate-100 group-hover:text-amber-400 transition-colors">
               Pothole<span className="text-amber-400">Detect</span>
             </span>
-            <span className="px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[9px] font-mono font-bold uppercase">
-              YOLOv8
+            <span className="px-1 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[8px] sm:text-[9px] font-mono font-bold uppercase">
+              AI
             </span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline leading-none">
-            Civil Road Vision System
+          <span className="text-[9px] text-slate-400 font-mono hidden xs:inline leading-none">
+            Road Hazard Vision
           </span>
         </div>
       </div>
