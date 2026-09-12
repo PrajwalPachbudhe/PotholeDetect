@@ -6,6 +6,7 @@ export default function Header({ user, onLogout, currentView, onNavigate, onOpen
   const navItems = [
     { id: 'scan', icon: 'radar', label: 'AI Scanner' },
     { id: 'map', icon: 'map', label: 'Hazard Map' },
+    { id: 'report', icon: 'description', label: 'Road Report' },
     { id: 'analytics', icon: 'insights', label: 'Analytics' },
     { id: 'history', icon: 'history', label: 'Audit History' },
   ];

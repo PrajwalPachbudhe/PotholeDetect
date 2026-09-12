@@ -5,6 +5,7 @@ import ScanView from './components/ScanView';
 import ResultsView from './components/ResultsView';
 import AnalyticsView from './components/AnalyticsView';
 import HistoryView from './components/HistoryView';
+import ReportView from './components/ReportView';
 import MapView from './components/MapView';
 import LoginView from './components/LoginView';
 import SignupView from './components/SignupView';
@@ -13,6 +14,7 @@ import SettingsModal from './components/SettingsModal';
 import Toast from './components/Toast';
 import ClickSpark from './components/ClickSpark';
 import { useGeolocation } from './utils/useGeolocation';
+import { getDistanceMeters } from './utils/clusterHazards';
 
 const DEFAULT_HAZARDS = [
   {
@@ -278,6 +280,7 @@ function App() {
     const gps = detectionData.gps || currentGps;
     const isCritical = (detectionData.total_detections || 0) >= 3;
     const topConfidence = detectionData.detections?.[0]?.confidence || 92;
+    const photoBase64 = detectionData.annotated || detectionData.original;
 
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const newHazard = {
@@ -289,14 +292,32 @@ function App() {
       detectedTime: 'Just now',
       coordsText: `${gps.lat.toFixed(4)}° N, ${gps.lng.toFixed(4)}° W`,
       confidence: `${typeof topConfidence === 'number' && topConfidence <= 1 ? Math.round(topConfidence * 100) : topConfidence}%`,
-      image: detectionData.annotated
-        ? `data:image/jpeg;base64,${detectionData.annotated}`
+      image: photoBase64
+        ? `data:image/jpeg;base64,${photoBase64}`
         : 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // Add to hazards list
-    setHazards((prev) => [newHazard, ...prev.filter((h) => h.id !== newHazard.id)]);
+    // Smart Clustering: update existing nearby hazard if within 45m, else add new
+    setHazards((prev) => {
+      const nearbyIdx = prev.findIndex(
+        (h) => getDistanceMeters(h.lat, h.lng, gps.lat, gps.lng) <= 45
+      );
+      if (nearbyIdx >= 0) {
+        const updated = [...prev];
+        const existing = updated[nearbyIdx];
+        updated[nearbyIdx] = {
+          ...existing,
+          title: gps.address || existing.title,
+          detectedTime: 'Just now',
+          confidence: `${typeof topConfidence === 'number' && topConfidence <= 1 ? Math.round(topConfidence * 100) : topConfidence}%`,
+          image: photoBase64 ? `data:image/jpeg;base64,${photoBase64}` : existing.image,
+          severity: isCritical || existing.severity === 'critical' ? 'critical' : 'moderate',
+        };
+        return updated;
+      }
+      return [newHazard, ...prev];
+    });
 
     // Also auto-append to scan history
     setHistory((prev) => [
@@ -394,6 +415,17 @@ function App() {
         {currentView === 'analytics' && (
           <AnalyticsView
             history={history}
+            onNavigateToReport={() => handleNavigate('report')}
+            showToast={showToast}
+          />
+        )}
+
+        {currentView === 'report' && (
+          <ReportView
+            history={history}
+            hazards={hazards}
+            user={user}
+            onNavigateToMap={() => handleNavigate('map')}
             showToast={showToast}
           />
         )}
@@ -401,8 +433,10 @@ function App() {
         {currentView === 'history' && (
           <HistoryView
             history={history}
+            hazards={hazards}
             onClearHistory={handleClearHistory}
             onNavigateToMap={() => handleNavigate('map')}
+            onNavigateToReport={() => handleNavigate('report')}
             showToast={showToast}
           />
         )}

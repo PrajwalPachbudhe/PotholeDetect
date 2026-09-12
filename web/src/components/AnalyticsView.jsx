@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 
-export default function AnalyticsView({ history = [], showToast }) {
+export default function AnalyticsView({ history = [], onNavigateToReport, showToast }) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('30d');
 
   // Compute live stats from history if available, else standard telemetry
@@ -28,10 +28,14 @@ export default function AnalyticsView({ history = [], showToast }) {
   ];
 
   const handleExportReport = () => {
-    showToast?.('Generating Road Audit PDF Report...', 'info');
-    setTimeout(() => {
-      window.print();
-    }, 500);
+    if (onNavigateToReport) {
+      onNavigateToReport();
+    } else {
+      showToast?.('Opening Road Audit Report...', 'info');
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    }
   };
 
   return (
