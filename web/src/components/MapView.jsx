@@ -390,9 +390,9 @@ export default function MapView({
   };
 
   return (
-    <main className="flex-1 relative w-full h-[calc(100vh-64px)] min-h-[500px] flex flex-col overflow-hidden bg-[#0a0e17]">
+    <main className="flex-1 relative w-full h-[calc(100dvh-64px-65px)] md:h-[calc(100vh-64px)] min-h-[400px] flex flex-col overflow-hidden bg-[#0a0e17]">
       {/* Top HUD Controls & Search Bar */}
-      <div className="absolute top-4 left-4 right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-start gap-3">
+      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-start gap-2 md:gap-3">
         {/* Search Input Container */}
         <div className="pointer-events-auto relative w-full max-w-md">
           <form
@@ -645,7 +645,7 @@ export default function MapView({
       {/* Selected Hazard Drawer */}
       {selectedHazard && (
         <div
-          className={`absolute bottom-0 left-0 right-0 z-[500] bg-[#111827]/95 backdrop-blur-xl border-t border-slate-800 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
+          className={`absolute bottom-[65px] md:bottom-0 left-0 right-0 z-[500] bg-[#111827]/95 backdrop-blur-xl border-t border-slate-800 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
             isSheetOpen ? 'translate-y-0' : 'translate-y-[calc(100%-44px)]'
           }`}
         >
