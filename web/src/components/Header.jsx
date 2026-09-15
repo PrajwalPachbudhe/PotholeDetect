@@ -7,7 +7,7 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
     { id: 'scan', icon: 'radar', label: 'AI Scanner' },
     { id: 'map', icon: 'map', label: 'Hazard Map' },
     { id: 'report', icon: 'description', label: 'Road Report' },
-    { id: 'admin', icon: 'admin_panel_settings', label: 'Admin Dashboard' },
+    ...(user?.role === 'admin' ? [{ id: 'admin', icon: 'admin_panel_settings', label: 'Admin Dashboard' }] : []),
     { id: 'analytics', icon: 'insights', label: 'Analytics' },
     { id: 'history', icon: 'history', label: 'Audit History' },
   ];
@@ -140,16 +140,18 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
                   Scanner Dashboard
                 </button>
 
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    onNavigate('admin');
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-amber-400 hover:bg-amber-500/15 flex items-center gap-2 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
-                  Admin Dashboard
-                </button>
+                {user.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onNavigate('admin');
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-amber-400 hover:bg-amber-500/15 flex items-center gap-2 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+                    Admin Dashboard
+                  </button>
+                )}
 
                 <button
                   onClick={() => {

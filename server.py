@@ -229,9 +229,38 @@ def auth_signup():
         conn.close()
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/auth/users", methods=["GET"])
-def get_users_list():
-    """Admin endpoint to view all registered users, login credentials, and their detection statistics."""
+@app.route("/api/auth/users", methods=["GET", "POST"])
+def get_or_create_users():
+    """Admin endpoint to view all registered users or create a new user account."""
+    if request.method == "POST":
+        data = request.get_json() or {}
+        name = (data.get("name") or "").strip()
+        email = (data.get("email") or "").strip().lower()
+        password = data.get("password") or ""
+        role = data.get("role") or "officer"
+
+        if not name or not email or not password:
+            return jsonify({"error": "Name, email, and password are required"}), 400
+
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+                (name, email, password, role)
+            )
+            user_id = cursor.lastrowid
+            conn.commit()
+            user_dict = {"id": user_id, "name": name, "email": email, "role": role}
+            conn.close()
+            return jsonify({"status": "success", "user": user_dict}), 201
+        except sqlite3.IntegrityError:
+            conn.close()
+            return jsonify({"error": "An account with this email already exists"}), 409
+        except Exception as e:
+            conn.close()
+            return jsonify({"error": str(e)}), 500
+
     purge_expired_records()
     conn = get_db()
     cursor = conn.cursor()
@@ -249,6 +278,67 @@ def get_users_list():
     users = [dict(row) for row in rows]
     conn.close()
     return jsonify({"users": users})
+
+
+@app.route("/api/auth/users/<int:user_id>", methods=["PUT", "DELETE"])
+def manage_single_user(user_id):
+    """Admin endpoint to update or delete a specific user and their credentials."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    target_user = cursor.fetchone()
+    if not target_user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
+    if request.method == "DELETE":
+        # Protect default administrator from deletion
+        if target_user["email"] == "admin@city.gov":
+            conn.close()
+            return jsonify({"error": "The primary master administrator account cannot be deleted"}), 403
+
+        # Unlink or purge user data
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        cursor.execute("UPDATE hazards SET user_id = NULL WHERE user_id = ?", (user_id,))
+        cursor.execute("UPDATE history SET user_id = NULL WHERE user_id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": f"User {target_user['name']} ({target_user['email']}) deleted successfully"}), 200
+
+    elif request.method == "PUT":
+        data = request.get_json() or {}
+        name = (data.get("name") or target_user["name"]).strip()
+        email = (data.get("email") or target_user["email"]).strip().lower()
+        password = data.get("password") or target_user["password"]
+        role = data.get("role") or target_user["role"]
+
+        if not name or not email or not password:
+            conn.close()
+            return jsonify({"error": "Name, email, and password cannot be empty"}), 400
+
+        try:
+            cursor.execute(
+                "UPDATE users SET name = ?, email = ?, password = ?, role = ? WHERE id = ?",
+                (name, email, password, role, user_id)
+            )
+            conn.commit()
+            updated_user = {
+                "id": user_id,
+                "name": name,
+                "email": email,
+                "password": password,
+                "role": role
+            }
+            conn.close()
+            return jsonify({"status": "success", "user": updated_user}), 200
+        except sqlite3.IntegrityError:
+            conn.close()
+            return jsonify({"error": "Another account with this email already exists"}), 409
+        except Exception as e:
+            conn.close()
+            return jsonify({"error": str(e)}), 500
+
 
 
 # ---------------------------------------------------------------------------
@@ -577,11 +667,30 @@ def admin_stats():
     """)
     severity_breakdown = {row["severity"]: row["count"] for row in cursor.fetchall()}
 
-    # Total Scans in past 7 days
-    cursor.execute("SELECT COUNT(*), SUM(total_detections) FROM history WHERE datetime(created_at) >= datetime('now', '-7 days')")
+    # Total Scans and Potholes in past 7 days
+    cursor.execute("""
+        SELECT COUNT(*), 
+               COALESCE(SUM(total_detections), 0),
+               AVG(CASE WHEN analysis_time IS NOT NULL AND analysis_time != '' THEN CAST(analysis_time AS REAL) ELSE NULL END)
+        FROM history 
+        WHERE datetime(created_at) >= datetime('now', '-7 days')
+    """)
     scan_row = cursor.fetchone()
     total_scans_7d = scan_row[0] or 0
     total_potholes_found = scan_row[1] or 0
+    avg_latency = round(scan_row[2] or 0.12, 2)
+
+    # Top road sectors / addresses from hazards
+    cursor.execute("""
+        SELECT title as sector, COUNT(*) as hazard_count,
+               SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical_count
+        FROM hazards
+        WHERE datetime(created_at) >= datetime('now', '-7 days')
+        GROUP BY title
+        ORDER BY hazard_count DESC
+        LIMIT 6
+    """)
+    top_sectors = [dict(row) for row in cursor.fetchall()]
 
     # Daily trend for past 7 days
     cursor.execute("""
@@ -600,7 +709,9 @@ def admin_stats():
         "active_hazards": active_hazards,
         "total_scans_7d": total_scans_7d,
         "total_potholes_found": total_potholes_found,
+        "avg_latency": avg_latency,
         "severity_breakdown": severity_breakdown,
+        "top_sectors": top_sectors,
         "daily_trends": daily_trends,
         "model_info": {
             "path": MODEL_PATH,

@@ -462,11 +462,15 @@ function App() {
   }, [isApiOnline, apiUrl, user, showToast]);
 
   const handleNavigate = useCallback((view) => {
+    if (view === 'admin' && user?.role !== 'admin') {
+      showToast('Access Denied: Administrator role required', 'error');
+      return;
+    }
     if (view === 'scan') {
       setResults(null);
     }
     setCurrentView(view);
-  }, []);
+  }, [user?.role, showToast]);
 
   return (
     <ClickSpark
@@ -519,7 +523,7 @@ function App() {
           />
         )}
 
-        {currentView === 'admin' && (
+        {currentView === 'admin' && user?.role === 'admin' && (
           <AdminDashboardView
             apiUrl={apiUrl}
             user={user}
@@ -531,6 +535,9 @@ function App() {
         {currentView === 'analytics' && (
           <AnalyticsView
             history={history}
+            hazards={hazards}
+            apiUrl={apiUrl}
+            user={user}
             onNavigateToReport={() => handleNavigate('report')}
             showToast={showToast}
           />
