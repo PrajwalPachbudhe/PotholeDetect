@@ -17,19 +17,22 @@ import ClickSpark from './components/ClickSpark';
 import { useGeolocation } from './utils/useGeolocation';
 import { getDistanceMeters } from './utils/clusterHazards';
 
-// Fast dynamic API address: auto-detects ngrok tunnel, local Flask 5000, or current origin
+// Fast dynamic API address: connects Render/Vercel/mobile to your live PC backend
 const getInitialApiUrl = () => {
   if (typeof window !== 'undefined') {
-    if (window.location.origin && window.location.origin.includes('ngrok')) {
-      return window.location.origin;
-    }
-    if (window.location.port === '5173') {
+    const origin = window.location.origin || '';
+    const host = window.location.hostname || '';
+    
+    // Local development
+    if (host === 'localhost' || host === '127.0.0.1') {
       return 'http://127.0.0.1:5000';
     }
-    if (window.location.origin && window.location.origin !== 'null' && window.location.origin.startsWith('http')) {
-      return window.location.origin;
+    // Direct ngrok domain
+    if (origin.includes('ngrok')) {
+      return origin;
     }
   }
+  // External deployments (e.g. onrender.com, Vercel, or mobile devices)
   return 'https://oversleep-relic-stubbed.ngrok-free.dev';
 };
 
