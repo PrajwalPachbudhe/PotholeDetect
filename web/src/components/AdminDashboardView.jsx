@@ -974,7 +974,87 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile View: Clean Responsive Cards */}
+        <div className="md:hidden flex flex-col gap-3">
+          {filteredUsers.length > 0 ? (
+            filteredUsers.map((u) => {
+              const isPrimaryAdmin = u.email === 'admin@city.gov';
+              return (
+                <div
+                  key={u.id}
+                  className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2.5 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs uppercase border border-amber-500/30 flex-shrink-0">
+                        {u.name ? u.name[0] : 'U'}
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-slate-200 truncate">{u.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono truncate">{u.email}</p>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`px-2 py-0.5 rounded-md font-mono text-[9px] font-bold uppercase flex-shrink-0 ${
+                        u.role === 'admin'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}
+                    >
+                      {u.role || 'Officer'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-slate-900/90 rounded-xl px-2.5 py-1.5 border border-slate-800 text-[11px] font-mono">
+                    <span className="text-slate-400 text-[10px]">Password:</span>
+                    <span className="text-amber-300 font-semibold truncate max-w-[150px]">
+                      {showPasswords ? (u.password || '••••••••') : '••••••••'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                    <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400">
+                      <span>Pins: <strong className="text-amber-400">{u.hazard_count ?? 0}</strong></span>
+                      <span>Scans: <strong className="text-cyan-400">{u.scan_count ?? 0}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(u)}
+                        title="Edit User Credentials"
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500/20 hover:text-amber-400 text-slate-300 border border-slate-700/60 text-xs font-semibold flex items-center gap-1 transition-all"
+                      >
+                        <span className="material-symbols-outlined text-xs">edit</span>
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => setUserToDelete(u)}
+                        disabled={isPrimaryAdmin}
+                        title={isPrimaryAdmin ? 'Master Admin cannot be deleted' : 'Delete User and Credentials'}
+                        className={`p-1 rounded-lg transition-all ${
+                          isPrimaryAdmin
+                            ? 'bg-slate-800/40 text-slate-600 border border-slate-800 cursor-not-allowed'
+                            : 'bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-300 border border-slate-700/60'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-xs">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="py-6 text-center text-slate-500 text-xs">
+              No users found in database.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View: Full Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px]">

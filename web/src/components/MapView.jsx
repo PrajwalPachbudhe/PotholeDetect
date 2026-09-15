@@ -639,28 +639,28 @@ export default function MapView({
         </div>
       </div>
 
-      {/* Floating Speedometer & Live Telemetry Badge (Positioned below top pills) */}
+      {/* Floating Speedometer & Live Telemetry Badge (Compact on Mobile) */}
       {currentGps && (
-        <div className="absolute top-[88px] md:top-20 left-2 md:left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-700/80 rounded-xl p-2 md:p-3 shadow-2xl flex items-center gap-2.5 max-w-[280px] md:max-w-sm animate-in fade-in">
-          <div className="w-9 h-9 md:w-11 md:h-11 rounded-lg bg-blue-500/15 border border-blue-500/40 flex flex-col items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] flex-shrink-0">
-            <span className="text-xs md:text-sm font-extrabold font-heading leading-none">
+        <div className="absolute top-[84px] md:top-20 left-2 md:left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-700/80 rounded-xl p-1.5 md:p-3 shadow-2xl flex items-center gap-2 max-w-[220px] md:max-w-sm animate-in fade-in">
+          <div className="w-8 h-8 md:w-11 md:h-11 rounded-lg bg-blue-500/15 border border-blue-500/40 flex flex-col items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] flex-shrink-0">
+            <span className="text-[11px] md:text-sm font-extrabold font-heading leading-none">
               {currentGps.speed || 0}
             </span>
-            <span className="text-[7px] font-mono uppercase text-slate-400">km/h</span>
+            <span className="text-[6px] md:text-[7px] font-mono uppercase text-slate-400">km/h</span>
           </div>
 
           <div className="flex flex-col min-w-0 pr-1">
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
-              <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider truncate">
+              <span className="text-[8px] md:text-[9px] font-mono text-slate-400 uppercase tracking-wider truncate">
                 LIVE GPS
               </span>
             </div>
-            <p className="text-[11px] md:text-xs font-bold text-slate-100 truncate mt-0.5">
+            <p className="text-[10px] md:text-xs font-bold text-slate-100 truncate mt-0.5">
               {currentGps.address || 'Road Track'}
             </p>
-            <p className="text-[9px] font-mono text-cyan-400 truncate">
-              {currentGps.lat?.toFixed(4)}°N, {currentGps.lng?.toFixed(4)}°W • Head {currentGps.heading || 0}°
+            <p className="text-[8px] md:text-[9px] font-mono text-cyan-400 truncate">
+              {currentGps.lat?.toFixed(4)}°N, {currentGps.lng?.toFixed(4)}°W
             </p>
           </div>
         </div>

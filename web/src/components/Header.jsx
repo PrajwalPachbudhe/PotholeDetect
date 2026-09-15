@@ -63,18 +63,18 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
       </nav>
 
       {/* Right Controls: Install App, Automatic AI Edge Status & User Profile */}
-      <div className="flex items-center gap-2.5">
-        {/* PWA / Chrome Mobile App Install Button */}
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
+        {/* PWA / Chrome Mobile App Install Button (Compact on Mobile) */}
         {onInstallApp && (
           <button
             onClick={onInstallApp}
             title="Install PotholeDetect App on Android / PC"
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-500/40 text-amber-300 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] active:scale-95"
+            className="flex items-center gap-1 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-500/40 text-amber-300 rounded-lg sm:rounded-xl px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold transition-all shadow-[0_0_12px_rgba(245,158,11,0.15)] active:scale-95 flex-shrink-0"
           >
             <span className="material-symbols-outlined text-sm text-amber-400">
               install_mobile
             </span>
-            <span className="text-[11px] font-mono font-bold">Install App</span>
+            <span className="font-mono font-bold hidden xs:inline">Install</span>
           </button>
         )}
 
@@ -96,21 +96,21 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
 
         {/* User Profile / Auth */}
         {user ? (
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center gap-2 bg-slate-900 border border-slate-700/80 hover:border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-semibold transition-all"
+              className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 hover:border-amber-500/40 rounded-xl px-2 py-1 sm:px-3 sm:py-1.5 text-xs text-slate-200 font-semibold transition-all"
             >
-              <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-[11px] flex items-center justify-center uppercase">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] sm:text-[11px] flex items-center justify-center uppercase flex-shrink-0">
                 {user.name ? user.name[0] : 'U'}
               </div>
-              <span className="max-w-[100px] truncate hidden sm:inline">{user.name}</span>
+              <span className="max-w-[90px] truncate hidden sm:inline">{user.name}</span>
               {user.role === 'admin' && (
-                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[8px] font-mono uppercase font-bold">
+                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[8px] font-mono uppercase font-bold hidden xs:inline">
                   Admin
                 </span>
               )}
-              <span className="material-symbols-outlined text-sm text-slate-400">expand_more</span>
+              <span className="material-symbols-outlined text-xs sm:text-sm text-slate-400">expand_more</span>
             </button>
 
             {/* Dropdown Menu */}
