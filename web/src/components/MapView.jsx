@@ -503,6 +503,12 @@ export default function MapView({
 
         {/* Action Pills Bar (Horizontal scroll on mobile, flex on desktop) */}
         <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+          {/* 7-Day Active Map Indicator */}
+          <div className="bg-amber-500/15 border border-amber-500/30 rounded-xl px-2.5 py-1 flex items-center gap-1.5 text-amber-300 text-[10px] font-mono font-bold shadow-xl flex-shrink-0 backdrop-blur-xl">
+            <span className="material-symbols-outlined text-xs text-amber-400">history</span>
+            <span>7-Day Active Dots</span>
+          </div>
+
           {/* Map Layer Switcher */}
           <div className="bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-xl p-0.5 flex items-center gap-0.5 shadow-xl flex-shrink-0">
             {Object.keys(TILE_LAYERS).map((styleKey) => (

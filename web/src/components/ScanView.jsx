@@ -320,29 +320,37 @@ export default function ScanView({
     };
   }, [scanMode, facingMode]);
 
-  // Autonomous Live Inference Loop & Real-Time GPS Pinning
+  // Autonomous Live Inference Loop & Real-Time GPS Pinning (Ultra-Fast)
   useEffect(() => {
     if (scanMode !== 'camera' || !cameraActive) return;
 
     let isRunning = true;
+    let isProcessing = false;
     let frameCount = 0;
     let lastFpsTime = performance.now();
 
     async function streamInference() {
-      if (!isRunning) return;
+      if (!isRunning || isProcessing) return;
 
       if (videoRef.current && videoRef.current.readyState >= 2) {
+        isProcessing = true;
         const frameStart = performance.now();
         try {
           const offCanvas = document.createElement('canvas');
-          offCanvas.width = 640;
-          offCanvas.height = 480;
+          // High-speed 480x360 resolution for fast AI inference
+          offCanvas.width = 480;
+          offCanvas.height = 360;
           const ctx = offCanvas.getContext('2d');
-          ctx.drawImage(videoRef.current, 0, 0, 640, 480);
+          ctx.drawImage(videoRef.current, 0, 0, 480, 360);
 
-          const blob = await new Promise((res) => offCanvas.toBlob(res, 'image/jpeg', 0.65));
+          const blob = await new Promise((res) => offCanvas.toBlob(res, 'image/jpeg', 0.55));
+          if (!blob) {
+            isProcessing = false;
+            return;
+          }
+
           const formData = new FormData();
-          formData.append('image', blob);
+          formData.append('image', blob, 'frame.jpg');
 
           const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
           const res = await fetch(`${targetUrl}/api/stream_detect`, {
@@ -352,14 +360,25 @@ export default function ScanView({
               'Bypass-Tunnel-Reminder': 'true',
             },
             body: formData,
-            signal: AbortSignal.timeout(2000),
+            signal: AbortSignal.timeout(1500),
           });
 
           if (res.ok) {
             const data = await res.json();
-            const filteredBoxes = (data.detections || []).filter(
-              (b) => b.confidence >= confidenceThreshold
-            );
+            // Scale bbox back to original 640x480 coordinate space for overlay canvas
+            const scaleX = 640 / 480;
+            const scaleY = 480 / 360;
+
+            const filteredBoxes = (data.detections || [])
+              .filter((b) => b.confidence >= confidenceThreshold)
+              .map((b) => ({
+                ...b,
+                x1: b.x1 * scaleX,
+                y1: b.y1 * scaleY,
+                x2: b.x2 * scaleX,
+                y2: b.y2 * scaleY,
+              }));
+
             setLiveBoxes(filteredBoxes);
             setIsConnected(true);
             const latency = Math.round(performance.now() - frameStart);
@@ -390,7 +409,7 @@ export default function ScanView({
 
                 // Push to global Map & History
                 if (onAutoLogHazard) {
-                  const snapshotUrl = offCanvas.toDataURL('image/jpeg', 0.75);
+                  const snapshotUrl = offCanvas.toDataURL('image/jpeg', 0.65);
                   onAutoLogHazard({
                     original: snapshotUrl.split(',')[1],
                     annotated: snapshotUrl.split(',')[1],
@@ -410,6 +429,8 @@ export default function ScanView({
           }
         } catch (err) {
           setIsConnected(false);
+        } finally {
+          isProcessing = false;
         }
 
         frameCount++;
@@ -422,7 +443,8 @@ export default function ScanView({
       }
 
       if (isRunning) {
-        setTimeout(streamInference, 300); // High responsiveness
+        // Fast dynamic throttle for high frame rate (sub-100ms)
+        setTimeout(streamInference, 70);
       }
     }
 

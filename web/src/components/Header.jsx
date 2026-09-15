@@ -9,6 +9,7 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
     { id: 'report', icon: 'description', label: 'Road Report' },
     { id: 'analytics', icon: 'insights', label: 'Analytics' },
     { id: 'history', icon: 'history', label: 'Audit History' },
+    ...(user?.role === 'admin' ? [{ id: 'admin', icon: 'admin_panel_settings', label: 'Admin Console' }] : []),
   ];
 
   return (
@@ -88,7 +89,7 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
               AI EDGE {isApiOnline ? 'LIVE' : 'CHECK'}
             </span>
             <span className="text-[11px] font-mono text-cyan-400 font-bold leading-none truncate max-w-[120px]">
-              YOLOv8 Connected
+              YOLOv8 Fast
             </span>
           </div>
         </div>
@@ -104,6 +105,11 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
                 {user.name ? user.name[0] : 'U'}
               </div>
               <span className="max-w-[100px] truncate hidden sm:inline">{user.name}</span>
+              {user.role === 'admin' && (
+                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[8px] font-mono uppercase font-bold">
+                  Admin
+                </span>
+              )}
               <span className="material-symbols-outlined text-sm text-slate-400">expand_more</span>
             </button>
 
@@ -116,6 +122,11 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
                 <div className="px-3 py-2 border-b border-slate-800 mb-1">
                   <p className="text-xs font-bold text-slate-200 truncate">{user.name}</p>
                   <p className="text-[10px] text-slate-400 truncate">{user.email || 'Inspector'}</p>
+                  {user.role && (
+                    <span className="inline-block mt-1 px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 text-[9px] font-mono uppercase font-bold">
+                      {user.role}
+                    </span>
+                  )}
                 </div>
 
                 <button
@@ -128,6 +139,19 @@ export default function Header({ user, onLogout, currentView, onNavigate, isApiO
                   <span className="material-symbols-outlined text-sm">radar</span>
                   Scanner Dashboard
                 </button>
+
+                {user.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onNavigate('admin');
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-amber-400 hover:bg-amber-500/15 flex items-center gap-2 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+                    Admin Console
+                  </button>
+                )}
 
                 <button
                   onClick={() => {

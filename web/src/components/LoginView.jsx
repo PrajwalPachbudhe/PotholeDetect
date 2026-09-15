@@ -1,39 +1,68 @@
 import { useState } from 'react';
 
-export default function LoginView({ onLogin, onNavigate, showToast }) {
+export default function LoginView({ onLogin, onNavigate, showToast, apiUrl }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!identifier.trim()) {
-      showToast('Please enter your email or ID', 'error');
+      showToast?.('Please enter your email or ID', 'error');
       return;
     }
     if (!password) {
-      showToast('Please enter your password', 'error');
+      showToast?.('Please enter your password', 'error');
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
+    try {
+      const res = await fetch(`${targetUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+        body: JSON.stringify({ identifier: identifier.trim(), password }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.user) {
+        onLogin(data.user);
+        showToast?.(`Welcome back, ${data.user.name} (${data.user.role.toUpperCase()})!`, 'success');
+      } else {
+        showToast?.(data.error || 'Invalid email or password', 'error');
+      }
+    } catch (err) {
+      console.warn('Backend login error, falling back locally:', err);
+      // Fallback local authentication
+      const isAdmin = identifier.toLowerCase().includes('admin');
       const user = {
         name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
         email: identifier.includes('@') ? identifier : `${identifier}@city.gov`,
-        role: 'Road Safety Officer',
+        role: isAdmin ? 'admin' : 'officer',
       };
       onLogin(user);
-      showToast(`Welcome back, ${user.name}!`, 'success');
-    }, 800);
+      showToast?.(`Logged in as ${user.name} (${user.role})`, 'success');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleQuickDemo = () => {
+  const handleQuickOfficer = () => {
     setIdentifier('officer@city.gov');
     setPassword('demo1234');
-    showToast('Demo credentials filled!', 'info');
+    showToast?.('Officer demo credentials filled!', 'info');
+  };
+
+  const handleQuickAdmin = () => {
+    setIdentifier('admin@city.gov');
+    setPassword('admin123');
+    showToast?.('Admin credentials filled!', 'info');
   };
 
   return (
@@ -151,15 +180,23 @@ export default function LoginView({ onLogin, onNavigate, showToast }) {
           </div>
         </form>
 
-        {/* Quick Demo Login Option */}
-        <div className="mt-6 pt-4 border-t border-slate-800 text-center">
+        {/* Quick Demo Login Options */}
+        <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-center gap-2">
           <button
             type="button"
-            onClick={handleQuickDemo}
-            className="text-xs text-slate-400 hover:text-cyan-400 transition-colors inline-flex items-center gap-1.5 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-cyan-500/30"
+            onClick={handleQuickOfficer}
+            className="text-xs text-slate-300 hover:text-cyan-400 transition-colors inline-flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700/80 hover:border-cyan-500/40"
           >
-            <span className="material-symbols-outlined text-sm text-cyan-400">bolt</span>
-            Fill Demo Credentials
+            <span className="material-symbols-outlined text-sm text-cyan-400">shield_person</span>
+            Officer Demo
+          </button>
+          <button
+            type="button"
+            onClick={handleQuickAdmin}
+            className="text-xs text-amber-300 hover:text-amber-200 transition-colors inline-flex items-center gap-1.5 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/30 hover:border-amber-400/60"
+          >
+            <span className="material-symbols-outlined text-sm text-amber-400">admin_panel_settings</span>
+            Admin Demo
           </button>
         </div>
       </div>

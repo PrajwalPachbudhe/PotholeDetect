@@ -83,11 +83,16 @@ export default function HistoryView({
             <span className="material-symbols-outlined text-2xl">history</span>
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-100 font-heading">
-              Road Hazard Audit Log
-            </h1>
-            <p className="text-xs md:text-sm text-slate-400">
-              Persistent archive of captured scans, grouped area defect clusters, and GPS logs
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-bold text-slate-100 font-heading">
+                Road Hazard Audit Log
+              </h1>
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-mono font-bold uppercase">
+                7-Day History
+              </span>
+            </div>
+            <p className="text-xs md:text-sm text-slate-400 mt-0.5">
+              Active detections linked to your user login • Auto-pruned after 7 days
             </p>
           </div>
         </div>

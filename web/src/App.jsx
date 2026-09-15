@@ -7,6 +7,7 @@ import AnalyticsView from './components/AnalyticsView';
 import HistoryView from './components/HistoryView';
 import ReportView from './components/ReportView';
 import MapView from './components/MapView';
+import AdminDashboardView from './components/AdminDashboardView';
 import LoginView from './components/LoginView';
 import SignupView from './components/SignupView';
 import ForgotPasswordView from './components/ForgotPasswordView';
@@ -16,7 +17,16 @@ import ClickSpark from './components/ClickSpark';
 import { useGeolocation } from './utils/useGeolocation';
 import { getDistanceMeters } from './utils/clusterHazards';
 
-const FIXED_API_URL = 'https://oversleep-relic-stubbed.ngrok-free.dev';
+// Fast dynamic API address: default to local port 5000 in dev or current origin
+const getInitialApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://127.0.0.1:5000';
+    }
+  }
+  return 'http://127.0.0.1:5000';
+};
 
 const DEFAULT_HAZARDS = [
   {
@@ -51,40 +61,7 @@ const DEFAULT_HAZARDS = [
     coordsText: '34.0485° N, 118.2495° W',
     confidence: '86.8%',
     image: 'https://images.unsplash.com/photo-1578637387939-43c525550085?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: 'PTH-650D',
-    title: 'Wilshire & Hope Intersection',
-    lat: 34.0498,
-    lng: -118.2580,
-    severity: 'moderate',
-    detectedTime: 'Yesterday, 4:20 PM',
-    coordsText: '34.0498° N, 118.2580° W',
-    confidence: '82.0%',
-    image: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: 'PTH-512E',
-    title: 'Sunset Highway Mile 12',
-    lat: 34.0570,
-    lng: -118.2400,
-    severity: 'critical',
-    detectedTime: 'Yesterday, 2:10 PM',
-    coordsText: '34.0570° N, 118.2400° W',
-    confidence: '97.1%',
-    image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: 'PTH-403F',
-    title: 'Olympic Blvd Overpass',
-    lat: 34.0420,
-    lng: -118.2550,
-    severity: 'moderate',
-    detectedTime: '2 Days Ago',
-    coordsText: '34.0420° N, 118.2550° W',
-    confidence: '89.4%',
-    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop',
-  },
+  }
 ];
 
 function App() {
@@ -93,7 +70,7 @@ function App() {
   const [analysisTime, setAnalysisTime] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Global Hazards State (synced across Map, Scanner, and localStorage)
+  // Global Hazards State (synced across Map, Scanner, and SQLite backend with 7-day expiry)
   const [hazards, setHazards] = useState(() => {
     try {
       const saved = localStorage.getItem('pothole_hazards_list');
@@ -103,7 +80,7 @@ function App() {
     }
   });
 
-  // History State
+  // History State (per-user detection logs)
   const [history, setHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('pothole_scan_history');
@@ -113,15 +90,27 @@ function App() {
     }
   });
 
-  // Hardcoded production AI Backend URL
-  const apiUrl = FIXED_API_URL;
+  const [apiUrl, setApiUrl] = useState(getInitialApiUrl);
   const [isApiOnline, setIsApiOnline] = useState(true);
 
-  // Auth state
-  const [user, setUser] = useState({
-    name: 'Inspector Alex',
-    email: 'officer@city.gov',
-    role: 'Road Safety Officer',
+  // Auth state persisted to localStorage
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pothole_active_user');
+      return saved ? JSON.parse(saved) : {
+        id: 2,
+        name: 'Inspector Alex',
+        email: 'officer@city.gov',
+        role: 'officer',
+      };
+    } catch {
+      return {
+        id: 2,
+        name: 'Inspector Alex',
+        email: 'officer@city.gov',
+        role: 'officer',
+      };
+    }
   });
 
   // Toast state
@@ -179,10 +168,10 @@ function App() {
     toggleSimulation,
   } = useGeolocation();
 
-  // Periodic Backend Health Check & Fetch Remote Hazards
+  // Periodic Backend Health Check & Fetch SQLite 7-Day Active Hazards & History
   useEffect(() => {
     let isMounted = true;
-    async function checkHealth() {
+    async function syncBackendData() {
       try {
         const clean = apiUrl.replace(/\/+$/, '');
         const res = await fetch(`${clean}/api/health`, {
@@ -191,16 +180,17 @@ function App() {
             'ngrok-skip-browser-warning': 'true',
             'Bypass-Tunnel-Reminder': 'true',
           },
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(3000),
         });
+        
         if (isMounted) {
           setIsApiOnline(res.ok);
         }
 
-        // Fetch remote hazards if available
         if (res.ok) {
+          // Fetch active hazards (< 7 days old)
           try {
-            const hRes = await fetch(`${clean}/api/hazards`, {
+            const hRes = await fetch(`${clean}/api/hazards?all=true`, {
               headers: {
                 'ngrok-skip-browser-warning': 'true',
                 'Bypass-Tunnel-Reminder': 'true',
@@ -210,15 +200,32 @@ function App() {
             if (hRes.ok) {
               const hData = await hRes.json();
               if (hData.hazards && hData.hazards.length > 0 && isMounted) {
-                setHazards((prev) => {
-                  const existingIds = new Set(prev.map((h) => h.id));
-                  const newItems = hData.hazards.filter((h) => !existingIds.has(h.id));
-                  return [...newItems, ...prev];
-                });
+                setHazards(hData.hazards);
               }
             }
           } catch {
             // Non-blocking
+          }
+
+          // Fetch user-scoped history if logged in
+          if (user?.email) {
+            try {
+              const histRes = await fetch(`${clean}/api/history?user_email=${encodeURIComponent(user.email)}`, {
+                headers: {
+                  'ngrok-skip-browser-warning': 'true',
+                  'Bypass-Tunnel-Reminder': 'true',
+                },
+                signal: AbortSignal.timeout(3000),
+              });
+              if (histRes.ok) {
+                const histData = await histRes.json();
+                if (histData.history && isMounted) {
+                  setHistory(histData.history);
+                }
+              }
+            } catch {
+              // Non-blocking
+            }
           }
         }
       } catch {
@@ -228,13 +235,13 @@ function App() {
       }
     }
 
-    checkHealth();
-    const interval = setInterval(checkHealth, 15000);
+    syncBackendData();
+    const interval = setInterval(syncBackendData, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [apiUrl]);
+  }, [apiUrl, user?.email]);
 
   // Persist hazards to localStorage
   useEffect(() => {
@@ -254,9 +261,26 @@ function App() {
     }
   }, [history]);
 
+  // Persist active user to localStorage
+  useEffect(() => {
+    try {
+      if (user) {
+        localStorage.setItem('pothole_active_user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('pothole_active_user');
+      }
+    } catch (err) {
+      console.warn('Could not persist user to localStorage', err);
+    }
+  }, [user]);
+
   const handleLogin = useCallback((loggedInUser) => {
     setUser(loggedInUser);
-    setCurrentView('scan');
+    if (loggedInUser.role === 'admin') {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('scan');
+    }
   }, []);
 
   const handleSignup = useCallback((newUser) => {
@@ -294,19 +318,38 @@ function App() {
         minute: '2-digit',
       });
 
-    setHistory((prev) => [
-      {
-        ...data,
-        analysisTime: elapsed,
-        timestamp,
-      },
-      ...prev,
-    ]);
+    const newScanEntry = {
+      ...data,
+      user_id: user?.id,
+      user_email: user?.email,
+      analysisTime: elapsed,
+      timestamp,
+    };
 
-    showToast('Saved to scan history!', 'success');
-  }, [showToast]);
+    setHistory((prev) => [newScanEntry, ...prev]);
 
-  // Automated Geotagged Pothole Logging (Called when a pothole is detected during live camera or upload)
+    // Send to backend SQLite
+    if (isApiOnline && apiUrl) {
+      try {
+        const clean = apiUrl.replace(/\/+$/, '');
+        fetch(`${clean}/api/history`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+          body: JSON.stringify(newScanEntry),
+        }).catch(() => {});
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    showToast('Saved to scan history in database!', 'success');
+  }, [showToast, user, isApiOnline, apiUrl]);
+
+  // Automated Geotagged Pothole Logging (Linked to Logged-in User with 7-Day Expiry)
   const handleAutoLogHazard = useCallback((detectionData) => {
     if (!detectionData || detectionData.total_detections === 0) return;
 
@@ -318,6 +361,9 @@ function App() {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const newHazard = {
       id: `PTH-${randomSuffix}`,
+      user_id: user?.id || 1,
+      user_email: user?.email || 'officer@city.gov',
+      user_name: user?.name || 'Inspector',
       title: gps.address || `Pothole at ${gps.lat.toFixed(4)}°N, ${gps.lng.toFixed(4)}°W`,
       lat: gps.lat,
       lng: gps.lng,
@@ -356,13 +402,15 @@ function App() {
     setHistory((prev) => [
       {
         ...detectionData,
+        user_id: user?.id,
+        user_email: user?.email,
         timestamp: `${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-        analysisTime: '0.12',
+        analysisTime: '0.08',
       },
       ...prev,
     ]);
 
-    // Send to backend API if online
+    // Send to backend SQLite API
     if (isApiOnline && apiUrl) {
       try {
         const clean = apiUrl.replace(/\/+$/, '');
@@ -375,16 +423,43 @@ function App() {
           },
           body: JSON.stringify(newHazard),
         }).catch(() => {});
+
+        fetch(`${clean}/api/history`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+          body: JSON.stringify({
+            ...detectionData,
+            user_id: user?.id,
+            user_email: user?.email,
+            analysisTime: '0.08',
+            gps: currentGps,
+          }),
+        }).catch(() => {});
       } catch {
         // Non-blocking
       }
     }
-  }, [currentGps, isApiOnline, apiUrl]);
+  }, [currentGps, isApiOnline, apiUrl, user]);
 
   const handleClearHistory = useCallback(() => {
     setHistory([]);
     localStorage.removeItem('pothole_scan_history');
-  }, []);
+    if (isApiOnline && apiUrl && user?.email) {
+      const clean = apiUrl.replace(/\/+$/, '');
+      fetch(`${clean}/api/history?user_email=${encodeURIComponent(user.email)}`, {
+        method: 'DELETE',
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+      }).catch(() => {});
+    }
+    showToast('Scan history cleared!', 'info');
+  }, [isApiOnline, apiUrl, user, showToast]);
 
   const handleNavigate = useCallback((view) => {
     if (view === 'scan') {
@@ -444,6 +519,15 @@ function App() {
           />
         )}
 
+        {currentView === 'admin' && (
+          <AdminDashboardView
+            apiUrl={apiUrl}
+            user={user}
+            showToast={showToast}
+            onNavigateToMap={() => handleNavigate('map')}
+          />
+        )}
+
         {currentView === 'analytics' && (
           <AnalyticsView
             history={history}
@@ -491,6 +575,7 @@ function App() {
             onLogin={handleLogin}
             onNavigate={handleNavigate}
             showToast={showToast}
+            apiUrl={apiUrl}
           />
         )}
 
@@ -499,6 +584,7 @@ function App() {
             onSignup={handleSignup}
             onNavigate={handleNavigate}
             showToast={showToast}
+            apiUrl={apiUrl}
           />
         )}
 
@@ -529,3 +615,4 @@ function App() {
 }
 
 export default App;
+

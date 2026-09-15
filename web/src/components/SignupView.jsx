@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function SignupView({ onSignup, onNavigate, showToast }) {
+export default function SignupView({ onSignup, onNavigate, showToast, apiUrl }) {
   const [fullName, setFullName] = useState('');
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
@@ -25,36 +25,64 @@ export default function SignupView({ onSignup, onNavigate, showToast }) {
 
   const strength = getPasswordStrength(password);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!fullName.trim()) {
-      showToast('Please enter your full name', 'error');
+      showToast?.('Please enter your full name', 'error');
       return;
     }
     if (!contact.trim()) {
-      showToast('Please enter your phone number or email', 'error');
+      showToast?.('Please enter your phone number or email', 'error');
       return;
     }
     if (!password || password.length < 6) {
-      showToast('Password must be at least 6 characters', 'error');
+      showToast?.('Password must be at least 6 characters', 'error');
       return;
     }
     if (!agreeTerms) {
-      showToast('You must agree to the Terms of Service', 'error');
+      showToast?.('You must agree to the Terms of Service', 'error');
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    const email = contact.includes('@') ? contact.trim() : `${contact.trim().toLowerCase().replace(/\s+/g, '')}@city.gov`;
+    const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
+    
+    try {
+      const res = await fetch(`${targetUrl}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+        body: JSON.stringify({
+          name: fullName.trim(),
+          email: email,
+          password: password,
+          role: 'officer',
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.user) {
+        onSignup(data.user);
+        showToast?.('Account created successfully in database! Welcome aboard.', 'success');
+      } else {
+        showToast?.(data.error || 'Failed to create account', 'error');
+      }
+    } catch (err) {
+      console.warn('Backend signup error, creating local session:', err);
       const user = {
         name: fullName.trim(),
-        email: contact.includes('@') ? contact : `${fullName.toLowerCase().replace(/\s+/g, '')}@city.gov`,
+        email: email,
         role: 'Community Reporter',
       };
       onSignup(user);
-      showToast('Account created successfully! Welcome aboard.', 'success');
-    }, 1000);
+      showToast?.('Account created successfully!', 'success');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -3,6 +3,7 @@ export default function BottomNav({ user, currentView, onNavigate }) {
     { id: 'scan', icon: 'radar', label: 'Scan' },
     { id: 'map', icon: 'map', label: 'Map' },
     { id: 'report', icon: 'description', label: 'Report' },
+    ...(user?.role === 'admin' ? [{ id: 'admin', icon: 'admin_panel_settings', label: 'Admin' }] : []),
     { id: 'analytics', icon: 'insights', label: 'Stats' },
     { id: 'history', icon: 'history', label: 'History' },
   ];
