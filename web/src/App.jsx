@@ -17,15 +17,20 @@ import ClickSpark from './components/ClickSpark';
 import { useGeolocation } from './utils/useGeolocation';
 import { getDistanceMeters } from './utils/clusterHazards';
 
-// Fast dynamic API address: default to local port 5000 in dev or current origin
+// Fast dynamic API address: auto-detects ngrok tunnel, local Flask 5000, or current origin
 const getInitialApiUrl = () => {
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    if (window.location.origin && window.location.origin.includes('ngrok')) {
+      return window.location.origin;
+    }
+    if (window.location.port === '5173') {
       return 'http://127.0.0.1:5000';
     }
+    if (window.location.origin && window.location.origin !== 'null' && window.location.origin.startsWith('http')) {
+      return window.location.origin;
+    }
   }
-  return 'http://127.0.0.1:5000';
+  return 'https://oversleep-relic-stubbed.ngrok-free.dev';
 };
 
 const DEFAULT_HAZARDS = [
