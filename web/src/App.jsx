@@ -65,7 +65,8 @@ const DEFAULT_HAZARDS = [
 ];
 
 function App() {
-  const [currentView, setCurrentView] = useState('scan');
+  // Login page appears first whenever opening website
+  const [currentView, setCurrentView] = useState('login');
   const [results, setResults] = useState(null);
   const [analysisTime, setAnalysisTime] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,23 +94,13 @@ function App() {
   const [apiUrl, setApiUrl] = useState(getInitialApiUrl);
   const [isApiOnline, setIsApiOnline] = useState(true);
 
-  // Auth state persisted to localStorage
+  // Auth state
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('pothole_active_user');
-      return saved ? JSON.parse(saved) : {
-        id: 2,
-        name: 'Inspector Alex',
-        email: 'officer@city.gov',
-        role: 'officer',
-      };
+      return saved ? JSON.parse(saved) : null;
     } catch {
-      return {
-        id: 2,
-        name: 'Inspector Alex',
-        email: 'officer@city.gov',
-        role: 'officer',
-      };
+      return null;
     }
   });
 
@@ -290,6 +281,7 @@ function App() {
 
   const handleLogout = useCallback(() => {
     setUser(null);
+    setCurrentView('login');
     showToast('Signed out successfully', 'info');
   }, [showToast]);
 

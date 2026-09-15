@@ -230,12 +230,12 @@ def auth_signup():
 
 @app.route("/api/auth/users", methods=["GET"])
 def get_users_list():
-    """Admin endpoint to view all registered users and their detection statistics."""
+    """Admin endpoint to view all registered users, login credentials, and their detection statistics."""
     purge_expired_records()
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT u.id, u.name, u.email, u.role, u.created_at, u.last_login,
+        SELECT u.id, u.name, u.email, u.password, u.role, u.created_at, u.last_login,
                COUNT(DISTINCT h.id) as hazard_count,
                COUNT(DISTINCT hs.id) as scan_count
         FROM users u
