@@ -487,6 +487,22 @@ def delete_single_hazard(hazard_id):
     if deleted > 0:
         return jsonify({"status": "success", "message": f"Hazard {hazard_id} deleted successfully."}), 200
     return jsonify({"error": "Hazard not found"}), 404
+
+@app.route("/api/hazards/batch-delete", methods=["POST"])
+def batch_delete_hazards():
+    """Admin endpoint to delete multiple hazard reports by IDs."""
+    data = request.get_json() or {}
+    hazard_ids = data.get("ids") or []
+    if not hazard_ids:
+        return jsonify({"error": "No hazard IDs provided"}), 400
+    conn = get_db()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" for _ in hazard_ids)
+    cursor.execute(f"DELETE FROM hazards WHERE id IN ({placeholders})", hazard_ids)
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "deleted_count": deleted}), 200
 @app.route("/api/hazards", methods=["GET", "POST"])
 def manage_hazards():
     # Automatically prune records > 7 days old
@@ -595,6 +611,22 @@ def delete_single_history(history_id):
     if deleted > 0:
         return jsonify({"status": "success", "message": f"Scan history #{history_id} deleted successfully."}), 200
     return jsonify({"error": "Scan history record not found"}), 404
+
+@app.route("/api/history/batch-delete", methods=["POST"])
+def batch_delete_history():
+    """Admin endpoint to delete multiple scan history records by IDs."""
+    data = request.get_json() or {}
+    history_ids = data.get("ids") or []
+    if not history_ids:
+        return jsonify({"error": "No history IDs provided"}), 400
+    conn = get_db()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" for _ in history_ids)
+    cursor.execute(f"DELETE FROM history WHERE id IN ({placeholders})", history_ids)
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "deleted_count": deleted}), 200
 
 
 @app.route("/api/history", methods=["GET", "POST", "DELETE"])

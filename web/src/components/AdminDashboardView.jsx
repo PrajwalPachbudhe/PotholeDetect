@@ -25,6 +25,12 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
   const [scanToDelete, setScanToDelete] = useState(null);
   const [isDeletingReport, setIsDeletingReport] = useState(false);
 
+  // Multi-Select Batch Delete State
+  const [selectedHazardIds, setSelectedHazardIds] = useState([]);
+  const [selectedScanIds, setSelectedScanIds] = useState([]);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(null); // { type: 'hazards' | 'scans', ids: [...] }
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+
   // Add User State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -178,6 +184,105 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
       showToast?.('Error deleting scan record', 'error');
     } finally {
       setIsDeletingReport(false);
+    }
+  };
+
+  // Multi-Select Toggle Functions
+  const toggleSelectHazard = (id) => {
+    setSelectedHazardIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllHazards = () => {
+    const currentFilteredIds = filteredHazards.map((h) => h.id);
+    const allSelected = currentFilteredIds.length > 0 && currentFilteredIds.every((id) => selectedHazardIds.includes(id));
+    if (allSelected) {
+      setSelectedHazardIds((prev) => prev.filter((id) => !currentFilteredIds.includes(id)));
+    } else {
+      setSelectedHazardIds((prev) => Array.from(new Set([...prev, ...currentFilteredIds])));
+    }
+  };
+
+  const toggleSelectScan = (id) => {
+    setSelectedScanIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllScans = () => {
+    const currentFilteredIds = filteredHistory.map((s) => s.id);
+    const allSelected = currentFilteredIds.length > 0 && currentFilteredIds.every((id) => selectedScanIds.includes(id));
+    if (allSelected) {
+      setSelectedScanIds((prev) => prev.filter((id) => !currentFilteredIds.includes(id)));
+    } else {
+      setSelectedScanIds((prev) => Array.from(new Set([...prev, ...currentFilteredIds])));
+    }
+  };
+
+  // Batch Delete Confirmation Handler
+  const handleConfirmBatchDelete = async () => {
+    if (!batchDeleteConfirm || !batchDeleteConfirm.ids?.length) return;
+    const { type, ids } = batchDeleteConfirm;
+    setIsBatchDeleting(true);
+    const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
+
+    try {
+      if (type === 'hazards') {
+        const res = await fetch(`${targetUrl}/api/hazards/batch-delete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+          body: JSON.stringify({ ids }),
+        });
+
+        if (res.ok) {
+          showToast?.(`Successfully deleted ${ids.length} hazard report(s) and cleared map pins!`, 'success');
+          setAllHazards((prev) => prev.filter((h) => !ids.includes(h.id)));
+          if (onDeleteHazard) {
+            ids.forEach((id) => onDeleteHazard(id));
+          }
+          setSelectedHazardIds((prev) => prev.filter((id) => !ids.includes(id)));
+          if (inspectedItem && ids.includes(inspectedItem.id)) {
+            setInspectedItem(null);
+          }
+          setBatchDeleteConfirm(null);
+          await fetchAdminData();
+        } else {
+          showToast?.('Failed to batch delete hazards', 'error');
+        }
+      } else if (type === 'scans') {
+        const res = await fetch(`${targetUrl}/api/history/batch-delete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+          body: JSON.stringify({ ids }),
+        });
+
+        if (res.ok) {
+          showToast?.(`Successfully deleted ${ids.length} scan history record(s)!`, 'success');
+          setAllHistory((prev) => prev.filter((s) => !ids.includes(s.id)));
+          setSelectedScanIds((prev) => prev.filter((id) => !ids.includes(id)));
+          if (inspectedItem && ids.includes(inspectedItem.id)) {
+            setInspectedItem(null);
+          }
+          setBatchDeleteConfirm(null);
+          await fetchAdminData();
+        } else {
+          showToast?.('Failed to batch delete scan records', 'error');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      showToast?.('Error processing batch delete request', 'error');
+    } finally {
+      setIsBatchDeleting(false);
     }
   };
 
@@ -733,6 +838,101 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
           </div>
         </div>
 
+        {/* Multi-Select Batch Action Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl">
+          <div className="flex items-center gap-3">
+            {feedTab === 'hazards' ? (
+              <button
+                onClick={toggleSelectAllHazards}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all active:scale-95"
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={
+                    filteredHazards.length > 0 &&
+                    filteredHazards.every((h) => selectedHazardIds.includes(h.id))
+                  }
+                  className="rounded border-slate-600 text-amber-500 focus:ring-0 cursor-pointer pointer-events-none"
+                />
+                <span>
+                  {filteredHazards.length > 0 &&
+                  filteredHazards.every((h) => selectedHazardIds.includes(h.id))
+                    ? 'Deselect All'
+                    : `Select All Filtered (${filteredHazards.length})`}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={toggleSelectAllScans}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all active:scale-95"
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={
+                    filteredHistory.length > 0 &&
+                    filteredHistory.every((s) => selectedScanIds.includes(s.id))
+                  }
+                  className="rounded border-slate-600 text-cyan-500 focus:ring-0 cursor-pointer pointer-events-none"
+                />
+                <span>
+                  {filteredHistory.length > 0 &&
+                  filteredHistory.every((s) => selectedScanIds.includes(s.id))
+                    ? 'Deselect All'
+                    : `Select All Filtered (${filteredHistory.length})`}
+                </span>
+              </button>
+            )}
+
+            {/* Selected Count Badge */}
+            {(feedTab === 'hazards' ? selectedHazardIds.length : selectedScanIds.length) > 0 && (
+              <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-xl flex items-center gap-1.5 animate-in fade-in">
+                <span className="material-symbols-outlined text-sm">checklist</span>
+                {feedTab === 'hazards' ? selectedHazardIds.length : selectedScanIds.length} Selected
+              </span>
+            )}
+          </div>
+
+          {/* Delete Selected Button */}
+          {(feedTab === 'hazards' ? selectedHazardIds.length : selectedScanIds.length) > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (feedTab === 'hazards') setSelectedHazardIds([]);
+                  else setSelectedScanIds([]);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+              >
+                Clear Selection
+              </button>
+              <button
+                onClick={() => {
+                  if (feedTab === 'hazards') {
+                    setBatchDeleteConfirm({
+                      type: 'hazards',
+                      ids: [...selectedHazardIds],
+                      count: selectedHazardIds.length,
+                    });
+                  } else {
+                    setBatchDeleteConfirm({
+                      type: 'scans',
+                      ids: [...selectedScanIds],
+                      count: selectedScanIds.length,
+                    });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/20 active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                <span>
+                  Delete Selected ({feedTab === 'hazards' ? selectedHazardIds.length : selectedScanIds.length})
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Feed Cards Grid */}
         {feedTab === 'hazards' ? (
           filteredHazards.length > 0 ? (
@@ -741,28 +941,52 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                 const photoSrc = hazard.image?.startsWith('data:') || hazard.image?.startsWith('http')
                   ? hazard.image
                   : hazard.image ? `data:image/jpeg;base64,${hazard.image}` : null;
+                const isSelected = selectedHazardIds.includes(hazard.id);
 
                 return (
                   <div
                     key={hazard.id}
                     onClick={() => setInspectedItem({ ...hazard, type: 'hazard' })}
-                    className="bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group hover:bg-slate-900/60 relative"
+                    className={`border rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group relative ${
+                      isSelected
+                        ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/30'
+                        : 'bg-slate-950/80 border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/60'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase ${
-                          hazard.severity === 'critical'
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        }`}
-                      >
-                        {hazard.severity || 'Moderate'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* Multi-Select Checkbox */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectHazard(hazard.id);
+                          }}
+                          className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500 border-amber-400 text-slate-950 font-bold shadow-sm'
+                              : 'bg-slate-900 border-slate-700 hover:border-amber-500/80 text-transparent'
+                          }`}
+                          title={isSelected ? 'Deselect hazard' : 'Select hazard for batch action'}
+                        >
+                          <span className="material-symbols-outlined text-sm leading-none font-bold">check</span>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase ${
+                            hazard.severity === 'critical'
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}
+                        >
+                          {hazard.severity || 'Moderate'}
+                        </span>
+                      </div>
+
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-slate-400 font-mono">
                           {hazard.detectedTime || hazard.createdAt || 'Recent'}
                         </span>
-                        {/* Quick Delete Button on Card */}
+                        {/* Quick Single Delete Button on Card */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -839,23 +1063,47 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                   ? scan.annotated
                   : scan.annotated ? `data:image/jpeg;base64,${scan.annotated}` : null;
                 const isCritical = (scan.total_detections || 0) >= 3;
+                const isSelected = selectedScanIds.includes(scan.id);
 
                 return (
                   <div
                     key={scan.id}
                     onClick={() => setInspectedItem({ ...scan, type: 'scan' })}
-                    className="bg-slate-950/80 border border-slate-800 hover:border-cyan-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group hover:bg-slate-900/60 relative"
+                    className={`border rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group relative ${
+                      isSelected
+                        ? 'bg-cyan-500/10 border-cyan-500 ring-2 ring-cyan-500/30'
+                        : 'bg-slate-950/80 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900/60'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase ${
-                          isCritical
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        }`}
-                      >
-                        {scan.total_detections} Pothole{scan.total_detections === 1 ? '' : 's'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* Multi-Select Checkbox */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectScan(scan.id);
+                          }}
+                          className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-bold shadow-sm'
+                              : 'bg-slate-900 border-slate-700 hover:border-cyan-500/80 text-transparent'
+                          }`}
+                          title={isSelected ? 'Deselect scan' : 'Select scan for batch action'}
+                        >
+                          <span className="material-symbols-outlined text-sm leading-none font-bold">check</span>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase ${
+                            isCritical
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}
+                        >
+                          {scan.total_detections} Pothole{scan.total_detections === 1 ? '' : 's'}
+                        </span>
+                      </div>
+
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-slate-400 font-mono">
                           {scan.timestamp || 'Recent'}
@@ -1435,6 +1683,52 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                   className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg transition-colors disabled:opacity-50"
                 >
                   {isDeletingReport ? 'Deleting...' : 'Delete Log'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 🗑️ BATCH DELETE MULTI-SELECT CONFIRMATION MODAL                            */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {batchDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-[#111827] border border-red-500/40 rounded-3xl p-6 shadow-2xl relative text-center flex flex-col items-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/40 flex items-center justify-center text-red-400 mb-3 shadow-lg shadow-red-500/20">
+                <span className="material-symbols-outlined text-4xl">delete_sweep</span>
+              </div>
+
+              <h3 className="text-lg font-bold text-slate-100 font-heading">
+                Delete {batchDeleteConfirm.count} Selected {batchDeleteConfirm.type === 'hazards' ? 'Hazard Reports' : 'Scan Records'}?
+              </h3>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                You are about to permanently delete <strong className="text-red-400">{batchDeleteConfirm.count}</strong> {batchDeleteConfirm.type === 'hazards' ? 'hazard pins from the map and SQLite database' : 'scan history logs and photo records'}. This action cannot be undone.
+              </p>
+
+              <div className="flex items-center gap-3 mt-6 w-full">
+                <button
+                  type="button"
+                  onClick={() => setBatchDeleteConfirm(null)}
+                  disabled={isBatchDeleting}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBatchDelete}
+                  disabled={isBatchDeleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/30 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isBatchDeleting ? 'Deleting...' : `Delete ${batchDeleteConfirm.count} Items`}
                 </button>
               </div>
             </motion.div>

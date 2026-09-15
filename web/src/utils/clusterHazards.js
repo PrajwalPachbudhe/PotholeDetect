@@ -93,17 +93,17 @@ export function groupHistoryByLocation(historyItems = [], radiusMeters = 45) {
       // Create new cluster
       clusters.push({
         id: item.id || `cluster-${clusters.length + 1}`,
-        lat: lat ?? 34.0522,
-        lng: lng ?? -118.2437,
+        lat: lat != null ? Number(lat) : null,
+        lng: lng != null ? Number(lng) : null,
         address: address,
         pothole_count: detectionCount,
         total_detections: detectionCount,
         detections: [...detections],
         photos: [photoObj],
         severity: detectionCount >= 3 ? 'critical' : detectionCount >= 1 ? 'moderate' : 'safe',
-        firstSeen: item.timestamp || item.detectedTime || 'Recent',
-        lastSeen: item.timestamp || item.detectedTime || 'Recent',
-        timestamp: item.timestamp || item.detectedTime || 'Recent',
+        firstSeen: item.timestamp || item.detectedTime || item.createdAt || 'Recent',
+        lastSeen: item.timestamp || item.detectedTime || item.createdAt || 'Recent',
+        timestamp: item.timestamp || item.detectedTime || item.createdAt || 'Recent',
         analysisTime: item.analysisTime || '0.12',
         gps: item.gps || { lat, lng, address },
       });
