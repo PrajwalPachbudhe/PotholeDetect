@@ -61,8 +61,22 @@ export default function ScanView({
       return;
     }
 
-    const lat = currentGps?.lat || 34.0515;
-    const lng = currentGps?.lng || -118.2480;
+    let lat = currentGps?.lat;
+    let lng = currentGps?.lng;
+    if (!lat || !lng) {
+      try {
+        const cached = localStorage.getItem('pothole_last_known_gps');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.lat && parsed.lng) {
+            lat = parsed.lat;
+            lng = parsed.lng;
+          }
+        }
+      } catch {}
+    }
+    lat = lat || 20.5937;
+    lng = lng || 78.9629;
 
     const miniMap = L.map(miniMapContainerRef.current, {
       center: [lat, lng],

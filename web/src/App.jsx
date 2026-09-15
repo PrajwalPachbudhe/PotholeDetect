@@ -506,7 +506,7 @@ function App() {
       sparkCount={8}
       duration={400}
     >
-      <div className="min-h-screen flex flex-col pb-[80px] md:pb-0 bg-[#0a0e17] text-slate-100 relative selection:bg-amber-500 selection:text-slate-950 font-body">
+      <div className={`min-h-screen flex flex-col ${currentView === 'map' ? 'h-screen overflow-hidden pb-[60px] md:pb-0' : 'pb-[80px] md:pb-0'} bg-[#0a0e17] text-slate-100 relative selection:bg-amber-500 selection:text-slate-950 font-body`}>
         <Toast toast={toast} onClose={handleCloseToast} />
 
         <Header

@@ -133,11 +133,24 @@ export default function MapView({
     const handleResize = () => map.invalidateSize();
     window.addEventListener('resize', handleResize);
 
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      });
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       window.removeEventListener('resize', handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -410,7 +423,7 @@ export default function MapView({
   };
 
   return (
-    <main className="flex-1 relative w-full h-[calc(100dvh-64px-65px)] md:h-[calc(100vh-64px)] min-h-[420px] flex flex-col overflow-hidden bg-[#0a0e17]">
+    <main className="flex-1 relative w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#0a0e17]">
       {/* Top Floating Header & Controls Container */}
       <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-stretch md:items-start gap-2">
         {/* Search Input */}
@@ -653,13 +666,13 @@ export default function MapView({
         </div>
       )}
 
-      {/* Map Viewport Container */}
-      <div ref={mapContainerRef} className="w-full h-full min-h-[400px] z-10" />
+      {/* Map Viewport Container - Covers 100% Full Viewport Area */}
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-10" />
 
       {/* Selected Hazard Drawer / Bottom Card */}
       {selectedHazard && (
         <div
-          className={`absolute bottom-[65px] md:bottom-3 left-2 right-2 md:left-auto md:right-4 md:w-96 z-[500] bg-[#111827]/95 backdrop-blur-2xl border border-slate-800 rounded-2xl shadow-[0_-8px_35px_rgba(0,0,0,0.7)] transition-all duration-300`}
+          className={`absolute bottom-3 md:bottom-4 left-2 right-2 md:left-auto md:right-4 md:w-96 z-[500] bg-[#111827]/95 backdrop-blur-2xl border border-slate-800 rounded-2xl shadow-[0_-8px_35px_rgba(0,0,0,0.7)] transition-all duration-300`}
         >
           {/* Collapsed Header / Toggle */}
           <div

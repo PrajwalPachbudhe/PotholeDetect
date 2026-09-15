@@ -116,9 +116,9 @@ export default function ReportView({ history = [], hazards = [], user, onNavigat
   return (
     <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-6 flex flex-col gap-6 animate-in fade-in duration-300 print:p-0 print:m-0 print:max-w-full">
       {/* Top Action & Control Header (Hidden in Print) */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-6 backdrop-blur-xl print:hidden">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-6 backdrop-blur-xl print:hidden">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)] flex-shrink-0">
             <span className="material-symbols-outlined text-2xl">description</span>
           </div>
           <div>
