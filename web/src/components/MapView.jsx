@@ -66,7 +66,15 @@ export default function MapView({
   }, [hazards]);
 
   useEffect(() => {
-    if (!selectedHazard && activeHazardsList.length > 0) {
+    if (selectedHazard) {
+      const exists = activeHazardsList.some((h) => h.id === selectedHazard.id);
+      if (!exists) {
+        setSelectedHazard(activeHazardsList.length > 0 ? activeHazardsList[0] : null);
+        if (activeHazardsList.length === 0) {
+          setIsSheetOpen(false);
+        }
+      }
+    } else if (activeHazardsList.length > 0) {
       setSelectedHazard(activeHazardsList[0]);
     }
   }, [activeHazardsList, selectedHazard]);

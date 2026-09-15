@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AdminDashboardView({ apiUrl, user, showToast, onNavigateToMap }) {
+export default function AdminDashboardView({ apiUrl, user, showToast, onNavigateToMap, onDeleteHazard }) {
   const [stats, setStats] = useState(null);
   const [usersList, setUsersList] = useState([]);
   const [allHazards, setAllHazards] = useState([]);
@@ -118,10 +118,11 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
   // Delete Hazard Handler (False Positive removal)
   const handleConfirmDeleteHazard = async () => {
     if (!hazardToDelete) return;
+    const deletingId = hazardToDelete.id;
     setIsDeletingReport(true);
     const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
     try {
-      const res = await fetch(`${targetUrl}/api/hazards/${hazardToDelete.id}`, {
+      const res = await fetch(`${targetUrl}/api/hazards/${deletingId}`, {
         method: 'DELETE',
         headers: {
           'ngrok-skip-browser-warning': 'true',
@@ -129,9 +130,12 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
         },
       });
       if (res.ok) {
-        showToast?.(`Hazard report ${hazardToDelete.id} removed from database!`, 'success');
-        setAllHazards((prev) => prev.filter((h) => h.id !== hazardToDelete.id));
-        if (inspectedItem?.id === hazardToDelete.id) {
+        showToast?.(`Hazard report ${deletingId} removed from database & map!`, 'success');
+        setAllHazards((prev) => prev.filter((h) => h.id !== deletingId));
+        if (onDeleteHazard) {
+          onDeleteHazard(deletingId);
+        }
+        if (inspectedItem?.id === deletingId) {
           setInspectedItem(null);
         }
         setHazardToDelete(null);

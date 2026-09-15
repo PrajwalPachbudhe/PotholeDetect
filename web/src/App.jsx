@@ -198,7 +198,7 @@ function App() {
             });
             if (hRes.ok) {
               const hData = await hRes.json();
-              if (hData.hazards && hData.hazards.length > 0 && isMounted) {
+              if (Array.isArray(hData.hazards) && isMounted) {
                 setHazards(hData.hazards);
               }
             }
@@ -555,6 +555,7 @@ function App() {
             user={user}
             showToast={showToast}
             onNavigateToMap={() => handleNavigate('map')}
+            onDeleteHazard={handleDeleteHazard}
           />
         )}
 
