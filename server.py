@@ -342,11 +342,11 @@ def manage_single_user(user_id):
 
 
 # ---------------------------------------------------------------------------
-# Real-Time AI Detection Endpoints (Optimized for High FPS)
+# Real-Time AI Detection Endpoints (Optimized for High Accuracy & No Noise)
 # ---------------------------------------------------------------------------
 @app.route("/api/stream_detect", methods=["POST"])
 def stream_detect():
-    """Ultra-fast lightweight stream detection with optimized resolution & half-precision."""
+    """Ultra-fast lightweight stream detection with noise rejection & confidence filtering."""
     if "image" not in request.files:
         return jsonify({"error": "No image file provided"}), 400
 
@@ -357,8 +357,12 @@ def stream_detect():
     if img is None:
         return jsonify({"error": "Invalid image file"}), 400
 
-    # High-speed inference (imgsz=416 gives optimal speed/accuracy trade-off)
-    results = model.predict(source=img, imgsz=416, conf=0.15, verbose=False)
+    # Read dynamic confidence threshold (default 0.35 to reject shadows and road texture noise)
+    conf_val = float(request.form.get("confidence") or request.args.get("conf") or 0.35)
+    conf_val = max(0.20, min(0.95, conf_val))
+
+    # High-speed inference with IoU NMS suppression
+    results = model.predict(source=img, imgsz=416, conf=conf_val, iou=0.45, verbose=False)
     
     detections = []
     if results and len(results) > 0:
@@ -368,6 +372,13 @@ def stream_detect():
                 cls_id = int(box.cls[0])
                 conf = float(box.conf[0])
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
+                
+                # Noise Rejection Filter: ignore tiny speckles (< 16x16 px) or abnormal noise
+                bw = x2 - x1
+                bh = y2 - y1
+                if bw < 16 or bh < 16:
+                    continue
+
                 detections.append({
                     "name": result.names[cls_id],
                     "confidence": conf,
@@ -382,7 +393,7 @@ def stream_detect():
 
 @app.route("/api/detect", methods=["POST"])
 def detect():
-    """Full single-image detection with annotated output and metadata."""
+    """Full single-image detection with noise rejection, annotated output, and metadata."""
     if "image" not in request.files:
         return jsonify({"error": "No image file provided"}), 400
 
@@ -393,7 +404,11 @@ def detect():
     if img is None:
         return jsonify({"error": "Invalid image file"}), 400
 
-    results = model.predict(source=img, imgsz=640, conf=0.15, verbose=False)
+    # Robust confidence threshold (default 0.35 to eliminate false-positive textures)
+    conf_val = float(request.form.get("confidence") or request.args.get("conf") or 0.35)
+    conf_val = max(0.20, min(0.95, conf_val))
+
+    results = model.predict(source=img, imgsz=640, conf=conf_val, iou=0.45, verbose=False)
     result = results[0]
 
     detections = []
@@ -402,6 +417,13 @@ def detect():
             cls_id = int(box.cls[0])
             conf = float(box.conf[0])
             x1, y1, x2, y2 = box.xyxy[0].tolist()
+
+            # Noise filter: reject tiny noise boxes
+            bw = x2 - x1
+            bh = y2 - y1
+            if bw < 18 or bh < 18:
+                continue
+
             detections.append({
                 "name": result.names[cls_id],
                 "confidence": round(conf * 100, 1),
@@ -453,6 +475,18 @@ def detect():
 # ---------------------------------------------------------------------------
 # Hazards & Map Dots (Database Scoped with 7-Day Auto Purge)
 # ---------------------------------------------------------------------------
+@app.route("/api/hazards/<hazard_id>", methods=["DELETE"])
+def delete_single_hazard(hazard_id):
+    """Admin endpoint to delete a specific hazard report / false positive."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM hazards WHERE id = ?", (hazard_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    if deleted > 0:
+        return jsonify({"status": "success", "message": f"Hazard {hazard_id} deleted successfully."}), 200
+    return jsonify({"error": "Hazard not found"}), 404
 @app.route("/api/hazards", methods=["GET", "POST"])
 def manage_hazards():
     # Automatically prune records > 7 days old
@@ -549,6 +583,20 @@ def manage_hazards():
 # ---------------------------------------------------------------------------
 # User History Management (7-Day Retention Scoped)
 # ---------------------------------------------------------------------------
+@app.route("/api/history/<int:history_id>", methods=["DELETE"])
+def delete_single_history(history_id):
+    """Admin endpoint to delete a specific scan history report."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM history WHERE id = ?", (history_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    if deleted > 0:
+        return jsonify({"status": "success", "message": f"Scan history #{history_id} deleted successfully."}), 200
+    return jsonify({"error": "Scan history record not found"}), 404
+
+
 @app.route("/api/history", methods=["GET", "POST", "DELETE"])
 def manage_history():
     purge_expired_records()

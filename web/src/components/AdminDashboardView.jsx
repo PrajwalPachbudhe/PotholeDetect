@@ -20,6 +20,11 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
   // Photo & Defect Inspection Modal State
   const [inspectedItem, setInspectedItem] = useState(null);
 
+  // Delete Hazard / Scan State
+  const [hazardToDelete, setHazardToDelete] = useState(null);
+  const [scanToDelete, setScanToDelete] = useState(null);
+  const [isDeletingReport, setIsDeletingReport] = useState(false);
+
   // Add User State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -107,6 +112,68 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
       showToast?.('Error triggering purge', 'error');
     } finally {
       setIsPurging(false);
+    }
+  };
+
+  // Delete Hazard Handler (False Positive removal)
+  const handleConfirmDeleteHazard = async () => {
+    if (!hazardToDelete) return;
+    setIsDeletingReport(true);
+    const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
+    try {
+      const res = await fetch(`${targetUrl}/api/hazards/${hazardToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+      });
+      if (res.ok) {
+        showToast?.(`Hazard report ${hazardToDelete.id} removed from database!`, 'success');
+        setAllHazards((prev) => prev.filter((h) => h.id !== hazardToDelete.id));
+        if (inspectedItem?.id === hazardToDelete.id) {
+          setInspectedItem(null);
+        }
+        setHazardToDelete(null);
+        await fetchAdminData();
+      } else {
+        showToast?.('Failed to delete hazard', 'error');
+      }
+    } catch (err) {
+      showToast?.('Error deleting hazard', 'error');
+    } finally {
+      setIsDeletingReport(false);
+    }
+  };
+
+  // Delete Scan History Handler
+  const handleConfirmDeleteScan = async () => {
+    if (!scanToDelete) return;
+    setIsDeletingReport(true);
+    const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
+    try {
+      const res = await fetch(`${targetUrl}/api/history/${scanToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Bypass-Tunnel-Reminder': 'true',
+        },
+      });
+      if (res.ok) {
+        showToast?.(`Scan record #${scanToDelete.id} deleted from database!`, 'success');
+        setAllHistory((prev) => prev.filter((s) => s.id !== scanToDelete.id));
+        if (inspectedItem?.id === scanToDelete.id) {
+          setInspectedItem(null);
+        }
+        setScanToDelete(null);
+        await fetchAdminData();
+      } else {
+        showToast?.('Failed to delete scan record', 'error');
+      }
+    } catch (err) {
+      showToast?.('Error deleting scan record', 'error');
+    } finally {
+      setIsDeletingReport(false);
     }
   };
 
@@ -439,7 +506,7 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
               </span>
             </div>
             <p className="text-sm text-slate-400 mt-0.5">
-              Live multi-device detections feed, photo evidence inspection, and device report generation.
+              Live multi-device detections feed, report & photo deletion, and device report generation.
             </p>
           </div>
         </div>
@@ -557,7 +624,7 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Click any photo to inspect full detection details. Filter by device/user and download audit reports.
+              Click any photo to inspect full detection details. Delete false positives, filter by device, or export work orders.
             </p>
           </div>
 
@@ -675,7 +742,7 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                   <div
                     key={hazard.id}
                     onClick={() => setInspectedItem({ ...hazard, type: 'hazard' })}
-                    className="bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group hover:bg-slate-900/60"
+                    className="bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group hover:bg-slate-900/60 relative"
                   >
                     <div className="flex items-center justify-between">
                       <span
@@ -687,9 +754,22 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                       >
                         {hazard.severity || 'Moderate'}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {hazard.detectedTime || hazard.createdAt || 'Recent'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {hazard.detectedTime || hazard.createdAt || 'Recent'}
+                        </span>
+                        {/* Quick Delete Button on Card */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHazardToDelete(hazard);
+                          }}
+                          title="Delete this hazard report / false positive"
+                          className="p-1 rounded-lg bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-400 border border-slate-700/60 hover:border-red-500/40 transition-all ml-1"
+                        >
+                          <span className="material-symbols-outlined text-xs">delete</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex gap-3 items-center">
@@ -734,7 +814,7 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                     <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] font-mono text-slate-400">
                       <span>ID: {hazard.id}</span>
                       <span className="text-amber-400 font-semibold group-hover:underline flex items-center gap-0.5">
-                        Inspect Photo & Data <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                        Inspect & Actions <span className="material-symbols-outlined text-xs">arrow_forward</span>
                       </span>
                     </div>
                   </div>
@@ -760,7 +840,7 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                   <div
                     key={scan.id}
                     onClick={() => setInspectedItem({ ...scan, type: 'scan' })}
-                    className="bg-slate-950/80 border border-slate-800 hover:border-cyan-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group hover:bg-slate-900/60"
+                    className="bg-slate-950/80 border border-slate-800 hover:border-cyan-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all shadow-md cursor-pointer group hover:bg-slate-900/60 relative"
                   >
                     <div className="flex items-center justify-between">
                       <span
@@ -772,9 +852,22 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                       >
                         {scan.total_detections} Pothole{scan.total_detections === 1 ? '' : 's'}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {scan.timestamp || 'Recent'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {scan.timestamp || 'Recent'}
+                        </span>
+                        {/* Quick Delete Button on Scan Card */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setScanToDelete(scan);
+                          }}
+                          title="Delete this scan history log"
+                          className="p-1 rounded-lg bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-400 border border-slate-700/60 hover:border-red-500/40 transition-all ml-1"
+                        >
+                          <span className="material-symbols-outlined text-xs">delete</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex gap-3 items-center">
@@ -818,7 +911,7 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                     <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] font-mono text-slate-400">
                       <span>Scan #{scan.id}</span>
                       <span className="text-cyan-400 font-semibold group-hover:underline flex items-center gap-0.5">
-                        Inspect Photo & BBoxes <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                        Inspect & Actions <span className="material-symbols-outlined text-xs">arrow_forward</span>
                       </span>
                     </div>
                   </div>
@@ -1146,11 +1239,118 @@ export default function AdminDashboardView({ apiUrl, user, showToast, onNavigate
                   )}
                 </div>
 
+                <div className="flex items-center gap-2">
+                  {/* Delete Report Button in Modal */}
+                  <button
+                    onClick={() => {
+                      if (inspectedItem.type === 'scan') {
+                        setScanToDelete(inspectedItem);
+                      } else {
+                        setHazardToDelete(inspectedItem);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-semibold active:scale-95 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    <span>Delete Record (False Positive)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setInspectedItem(null)}
+                    className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+                  >
+                    Close Inspection
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 🗑️ DELETE HAZARD CONFIRMATION MODAL                                       */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {hazardToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm bg-[#111827] border border-red-500/30 rounded-3xl p-6 shadow-2xl relative text-center flex flex-col items-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-3">
+                <span className="material-symbols-outlined text-3xl">delete_sweep</span>
+              </div>
+
+              <h3 className="text-base font-bold text-slate-100 font-heading">
+                Delete Pothole Report?
+              </h3>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                Are you sure you want to delete <strong className="text-slate-200">{hazardToDelete.title || hazardToDelete.id}</strong>? This hazard pin will be permanently removed from the map and SQLite database.
+              </p>
+
+              <div className="flex items-center gap-3 mt-6 w-full">
                 <button
-                  onClick={() => setInspectedItem(null)}
-                  className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+                  type="button"
+                  onClick={() => setHazardToDelete(null)}
+                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
                 >
-                  Close Inspection
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteHazard}
+                  disabled={isDeletingReport}
+                  className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg transition-colors disabled:opacity-50"
+                >
+                  {isDeletingReport ? 'Deleting...' : 'Delete Report'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 🗑️ DELETE SCAN HISTORY CONFIRMATION MODAL                                  */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {scanToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm bg-[#111827] border border-red-500/30 rounded-3xl p-6 shadow-2xl relative text-center flex flex-col items-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-3">
+                <span className="material-symbols-outlined text-3xl">delete</span>
+              </div>
+
+              <h3 className="text-base font-bold text-slate-100 font-heading">
+                Delete Scan History Log?
+              </h3>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                Delete scan record <strong className="text-slate-200">#{scanToDelete.id}</strong> ({scanToDelete.title || 'Road Scan'})? This log and its photo evidence will be removed.
+              </p>
+
+              <div className="flex items-center gap-3 mt-6 w-full">
+                <button
+                  type="button"
+                  onClick={() => setScanToDelete(null)}
+                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteScan}
+                  disabled={isDeletingReport}
+                  className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg transition-colors disabled:opacity-50"
+                >
+                  {isDeletingReport ? 'Deleting...' : 'Delete Log'}
                 </button>
               </div>
             </motion.div>

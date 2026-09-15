@@ -23,7 +23,7 @@ export default function ScanView({
   const [scanMode, setScanMode] = useState('camera'); // default to 'camera' for instant live dashcam
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0.15);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.35);
   const [isVoiceAlertEnabled, setIsVoiceAlertEnabled] = useState(true);
   const [recentDetectionAlert, setRecentDetectionAlert] = useState(null);
   const [taggedPotholesCount, setTaggedPotholesCount] = useState(0);
@@ -184,6 +184,7 @@ export default function ScanView({
     try {
       const formData = new FormData();
       formData.append('image', file);
+      formData.append('confidence', confidenceThreshold);
 
       const activeGps = customGps || currentGps;
       if (activeGps && activeGps.lat && activeGps.lng) {
@@ -351,6 +352,7 @@ export default function ScanView({
 
           const formData = new FormData();
           formData.append('image', blob, 'frame.jpg');
+          formData.append('confidence', confidenceThreshold);
 
           const targetUrl = (apiUrl || 'http://localhost:5000').replace(/\/+$/, '');
           const res = await fetch(`${targetUrl}/api/stream_detect`, {
