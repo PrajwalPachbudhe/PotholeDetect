@@ -35,6 +35,8 @@ export default function MapView({
   onStartGps,
   onStopGps,
   onToggleSimulation,
+  onDeleteHazard,
+  user,
   showToast,
 }) {
   const mapContainerRef = useRef(null);
@@ -57,6 +59,7 @@ export default function MapView({
   const [isSearching, setIsSearching] = useState(false);
   const [geoResults, setGeoResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const activeHazardsList = useMemo(() => {
     return hazards && hazards.length > 0 ? hazards : [];
@@ -68,15 +71,24 @@ export default function MapView({
     }
   }, [activeHazardsList, selectedHazard]);
 
-  // Determine initial center: prefer current user GPS or latest detected pothole
+  // Determine initial center: prefer current user GPS, cached GPS, or latest detected pothole
   const initialCenter = useMemo(() => {
     if (currentGps?.lat && currentGps?.lng) {
       return [currentGps.lat, currentGps.lng];
     }
+    try {
+      const saved = localStorage.getItem('pothole_last_known_gps');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.lat && parsed.lng) return [parsed.lat, parsed.lng];
+      }
+    } catch {
+      // ignore
+    }
     if (activeHazardsList.length > 0 && activeHazardsList[0].lat && activeHazardsList[0].lng) {
       return [activeHazardsList[0].lat, activeHazardsList[0].lng];
     }
-    return [34.0515, -118.2480];
+    return [20.5937, 78.9629]; // Default coordinates
   }, [currentGps, activeHazardsList]);
 
   // Initialize Leaflet Map
@@ -726,8 +738,30 @@ export default function MapView({
                   className="flex-1 bg-slate-900 border border-slate-700/80 hover:border-amber-500/40 rounded-xl py-2 flex items-center justify-center gap-1 text-slate-200 font-semibold text-xs transition-all"
                 >
                   <span className="material-symbols-outlined text-sm text-cyan-400">directions</span>
-                  Google Maps Route
+                  Route
                 </button>
+
+                {onDeleteHazard && (
+                  <button
+                    disabled={isDeleting}
+                    onClick={async () => {
+                      if (window.confirm(`Delete this hazard pin (${selectedHazard.id || selectedHazard.title})?`)) {
+                        setIsDeleting(true);
+                        try {
+                          await onDeleteHazard(selectedHazard.id);
+                          setSelectedHazard(null);
+                        } finally {
+                          setIsDeleting(false);
+                        }
+                      }
+                    }}
+                    className="px-3 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/40 rounded-xl py-2 flex items-center justify-center gap-1 text-xs font-semibold transition-all active:scale-95"
+                    title="Delete Hazard Pin"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    Delete Pin
+                  </button>
+                )}
 
                 <button
                   onClick={() => {

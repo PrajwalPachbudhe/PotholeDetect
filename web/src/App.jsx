@@ -461,6 +461,32 @@ function App() {
     showToast('Scan history cleared!', 'info');
   }, [isApiOnline, apiUrl, user, showToast]);
 
+  const handleDeleteHazard = useCallback(async (hazardId) => {
+    setHazards((prev) => prev.filter((h) => h.id !== hazardId));
+    if (isApiOnline && apiUrl) {
+      try {
+        const clean = apiUrl.replace(/\/+$/, '');
+        const res = await fetch(`${clean}/api/hazards/${hazardId}`, {
+          method: 'DELETE',
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'Bypass-Tunnel-Reminder': 'true',
+          },
+        });
+        if (res.ok) {
+          showToast('Hazard pin deleted from map & database!', 'success');
+        } else {
+          showToast('Pin removed locally.', 'info');
+        }
+      } catch (err) {
+        console.error('Failed to delete hazard pin on backend:', err);
+        showToast('Pin removed locally.', 'info');
+      }
+    } else {
+      showToast('Hazard pin removed from map!', 'success');
+    }
+  }, [isApiOnline, apiUrl, showToast]);
+
   const handleNavigate = useCallback((view) => {
     if (view === 'admin' && user?.role !== 'admin') {
       showToast('Access Denied: Administrator role required', 'error');
@@ -573,6 +599,8 @@ function App() {
             onStartGps={startGpsTracking}
             onStopGps={stopGpsTracking}
             onToggleSimulation={toggleSimulation}
+            onDeleteHazard={handleDeleteHazard}
+            user={user}
             showToast={showToast}
           />
         )}

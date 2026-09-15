@@ -1,25 +1,39 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Default initial coordinates (Downtown road corridor)
-export const DEFAULT_COORDS = {
-  lat: 34.0522,
-  lng: -118.2437,
-  accuracy: 5,
-  speed: 0,
-  heading: 90,
-  address: 'Grand Ave & 5th St, Los Angeles, CA',
+// Get initial cached GPS or real fallback
+const getInitialCoords = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('pothole_last_known_gps');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+          return parsed;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return {
+    lat: 18.5204,
+    lng: 73.8567,
+    accuracy: 10,
+    speed: 0,
+    heading: 0,
+    address: 'Current Road Location',
+  };
 };
 
-// Simulation Route Coordinates (simulating a car driving along urban roads)
+export const DEFAULT_COORDS = getInitialCoords();
+
+// Simulation Route Coordinates
 export const SIMULATED_DRIVE_ROUTE = [
-  { lat: 34.0522, lng: -118.2437, speed: 38, heading: 45, address: '1400 Main St Bridge' },
-  { lat: 34.0531, lng: -118.2465, speed: 42, heading: 60, address: 'Main St & 4th Ave' },
-  { lat: 34.0545, lng: -118.2520, speed: 35, heading: 90, address: 'Grand Ave & 5th St' },
-  { lat: 34.0558, lng: -118.2545, speed: 28, heading: 110, address: 'Broadway Blvd #42' },
-  { lat: 34.0570, lng: -118.2400, speed: 48, heading: 85, address: 'Sunset Highway Mile 12' },
-  { lat: 34.0498, lng: -118.2580, speed: 32, heading: 180, address: 'Wilshire & Hope Intersection' },
-  { lat: 34.0485, lng: -118.2495, speed: 25, heading: 220, address: 'Olympic Blvd Overpass' },
-  { lat: 34.0420, lng: -118.2550, speed: 40, heading: 270, address: 'South Figueroa St & 9th' },
+  { lat: 18.5204, lng: 73.8567, speed: 38, heading: 45, address: 'Main Highway Sector 1' },
+  { lat: 18.5215, lng: 73.8580, speed: 42, heading: 60, address: 'Central Boulevard Link' },
+  { lat: 18.5230, lng: 73.8595, speed: 35, heading: 90, address: 'East Expressway Overpass' },
+  { lat: 18.5245, lng: 73.8610, speed: 28, heading: 110, address: 'North Ring Road Junction' },
+  { lat: 18.5260, lng: 73.8625, speed: 48, heading: 85, address: 'Industrial Corridor Sector 4' },
 ];
 
 /**
@@ -46,7 +60,7 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
 export function speakAlert(text) {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
-      window.speechSynthesis.cancel(); // Stop any pending speech
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
@@ -59,10 +73,10 @@ export function speakAlert(text) {
 }
 
 /**
- * Custom Hook for Live GPS Tracking & Drive Simulation
+ * Custom Hook for Live GPS Tracking & Drive Simulation (Fast Auto-Lock on Reload)
  */
 export function useGeolocation() {
-  const [coords, setCoords] = useState(DEFAULT_COORDS);
+  const [coords, setCoords] = useState(getInitialCoords);
   const [isTracking, setIsTracking] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [gpsLocked, setGpsLocked] = useState(false);
@@ -77,7 +91,7 @@ export function useGeolocation() {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        { headers: { 'Accept-Language': 'en' } }
+        { headers: { 'Accept-Language': 'en' }, signal: AbortSignal.timeout(3500) }
       );
       if (res.ok) {
         const data = await res.json();
@@ -88,7 +102,7 @@ export function useGeolocation() {
         }
       }
     } catch {
-      // Fallback
+      // Non-blocking fallback
     }
     return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°W`;
   }, []);
@@ -102,27 +116,82 @@ export function useGeolocation() {
     const speedKmH = speed !== null && speed !== undefined ? Math.round(speed * 3.6) : 0;
     const computedHeading = heading !== null && heading !== undefined ? Math.round(heading) : 0;
 
-    setCoords((prev) => ({
-      ...prev,
+    const newCoords = {
       lat: latitude,
       lng: longitude,
       accuracy: Math.round(accuracy || 5),
       speed: speedKmH,
       heading: computedHeading,
+      address: `${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°W`,
+    };
+
+    setCoords((prev) => ({
+      ...prev,
+      ...newCoords,
+      address: prev.address && !prev.address.includes('°') ? prev.address : newCoords.address,
     }));
+
+    try {
+      localStorage.setItem('pothole_last_known_gps', JSON.stringify(newCoords));
+    } catch {
+      // Storage error ignore
+    }
 
     // Update address in background
     fetchAddress(latitude, longitude).then((addr) => {
-      setCoords((prev) => ({ ...prev, address: addr }));
+      setCoords((prev) => {
+        const updated = { ...prev, address: addr };
+        try {
+          localStorage.setItem('pothole_last_known_gps', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
     });
   }, [fetchAddress]);
 
   // Handle GPS error
   const handleError = useCallback((err) => {
-    console.warn('Geolocation error:', err.message);
-    setError(err.message || 'GPS Signal Unavailable');
-    setGpsLocked(false);
+    console.warn('Geolocation error:', err?.message);
+    setError(err?.message || 'GPS Signal Unavailable');
   }, []);
+
+  // Automatic Fast Initial GPS Lock on Mount / Page Reload
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          handleSuccess(pos);
+        },
+        async () => {
+          // If browser GPS is denied or slow, fetch quick IP location fallback
+          try {
+            const ipRes = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(3000) });
+            if (ipRes.ok) {
+              const ipData = await ipRes.json();
+              if (ipData.success && ipData.latitude && ipData.longitude) {
+                const ipCoords = {
+                  lat: ipData.latitude,
+                  lng: ipData.longitude,
+                  accuracy: 500,
+                  speed: 0,
+                  heading: 0,
+                  address: `${ipData.city || 'City'}, ${ipData.region || ipData.country || ''}`,
+                };
+                setCoords(ipCoords);
+                setGpsLocked(true);
+                try {
+                  localStorage.setItem('pothole_last_known_gps', JSON.stringify(ipCoords));
+                } catch {}
+              }
+            }
+          } catch {
+            // Fallback
+          }
+        },
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+      );
+    }
+  }, [handleSuccess]);
 
   // Start Real Hardware GPS Tracking
   const startTracking = useCallback(() => {
@@ -143,14 +212,14 @@ export function useGeolocation() {
     navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
       enableHighAccuracy: true,
       timeout: 10000,
-      maximumAge: 1000,
+      maximumAge: 0,
     });
 
     // Continuous watch
     watchIdRef.current = navigator.geolocation.watchPosition(handleSuccess, handleError, {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 1000,
+      maximumAge: 0,
     });
   }, [handleSuccess, handleError, isSimulating]);
 
@@ -168,7 +237,7 @@ export function useGeolocation() {
     setIsSimulating(false);
   }, []);
 
-  // Start Live Route Drive Simulation (Ideal for desktop testing or demoing road traffic)
+  // Start Live Route Drive Simulation
   const toggleSimulation = useCallback(() => {
     if (isSimulating) {
       clearInterval(simIntervalRef.current);
@@ -200,7 +269,6 @@ export function useGeolocation() {
     simIntervalRef.current = setInterval(() => {
       simIndexRef.current = (simIndexRef.current + 1) % SIMULATED_DRIVE_ROUTE.length;
       const point = SIMULATED_DRIVE_ROUTE[simIndexRef.current];
-      // Add slight jitter for realism
       const jitterLat = (Math.random() - 0.5) * 0.0001;
       const jitterLng = (Math.random() - 0.5) * 0.0001;
       const currentSpeed = Math.max(15, Math.min(65, point.speed + Math.floor(Math.random() * 9 - 4)));
