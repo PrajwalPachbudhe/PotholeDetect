@@ -159,8 +159,8 @@ if torch.cuda.is_available():
 # Pre-warm model with dummy inference for sub-millisecond first response
 try:
     dummy = np.zeros((416, 416, 3), dtype=np.uint8)
-    model.predict(source=dummy, imgsz=416, conf=0.15, half=use_half, verbose=False)
-    print(f"🚀 Model warmed up successfully on device: {device} (half-precision: {use_half})")
+    model.predict(source=dummy, imgsz=416, conf=0.15, verbose=False)
+    print(f"🚀 Model warmed up successfully on device: {device}")
 except Exception as e:
     print(f"⚠️ Model warmup warning: {e}")
 
@@ -267,7 +267,7 @@ def stream_detect():
         return jsonify({"error": "Invalid image file"}), 400
 
     # High-speed inference (imgsz=416 gives optimal speed/accuracy trade-off)
-    results = model.predict(source=img, imgsz=416, conf=0.15, half=use_half, verbose=False)
+    results = model.predict(source=img, imgsz=416, conf=0.15, verbose=False)
     
     detections = []
     if results and len(results) > 0:
@@ -302,7 +302,7 @@ def detect():
     if img is None:
         return jsonify({"error": "Invalid image file"}), 400
 
-    results = model.predict(source=img, imgsz=640, conf=0.15, half=use_half, verbose=False)
+    results = model.predict(source=img, imgsz=640, conf=0.15, verbose=False)
     result = results[0]
 
     detections = []
