@@ -59,6 +59,7 @@ export default function MapView({
   const [isSearching, setIsSearching] = useState(false);
   const [geoResults, setGeoResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const activeHazardsList = useMemo(() => {
@@ -117,8 +118,7 @@ export default function MapView({
       maxZoom: layerConfig.maxZoom || 19,
     }).addTo(map);
     tileLayerRef.current = tileLayer;
-
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
     roadTrafficLayerRef.current.addTo(map);
     markersLayerRef.current.addTo(map);
@@ -424,18 +424,18 @@ export default function MapView({
 
   return (
     <main className="flex-1 relative w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#0a0e17]">
-      {/* Top Floating Header & Controls Container */}
-      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[400] pointer-events-none flex flex-col md:flex-row justify-between items-stretch md:items-start gap-2">
+      {/* Top Floating Search & Info Bar */}
+      <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[400] pointer-events-none flex items-center justify-between gap-2">
         {/* Search Input */}
-        <div className="pointer-events-auto relative w-full md:max-w-xs lg:max-w-sm flex-shrink-0">
+        <div className="pointer-events-auto relative flex-1 max-w-sm">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               if (activeHazardsList.length > 0) handleSelectHazard(activeHazardsList[0]);
             }}
-            className="bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-3.5 py-2 flex items-center gap-2.5 shadow-2xl hover:border-amber-500/40 transition-colors"
+            className="bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-3 py-1.5 md:py-2 flex items-center gap-2 shadow-2xl hover:border-amber-500/40 transition-colors"
           >
-            <span className="material-symbols-outlined text-slate-400 text-lg">search</span>
+            <span className="material-symbols-outlined text-slate-400 text-base md:text-lg">search</span>
             <input
               type="text"
               value={searchQuery}
@@ -534,116 +534,19 @@ export default function MapView({
           )}
         </div>
 
-        {/* Action Pills Bar (Horizontal scroll on mobile, flex on desktop) */}
-        <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
-          {/* 7-Day Active Map Indicator */}
-          <div className="bg-amber-500/15 border border-amber-500/30 rounded-xl px-2.5 py-1 flex items-center gap-1.5 text-amber-300 text-[10px] font-mono font-bold shadow-xl flex-shrink-0 backdrop-blur-xl">
-            <span className="material-symbols-outlined text-xs text-amber-400">history</span>
-            <span>7-Day Active Dots</span>
-          </div>
-
-          {/* Map Layer Switcher */}
-          <div className="bg-[#111827]/95 backdrop-blur-xl border border-slate-700/80 rounded-xl p-0.5 flex items-center gap-0.5 shadow-xl flex-shrink-0">
-            {Object.keys(TILE_LAYERS).map((styleKey) => (
-              <button
-                key={styleKey}
-                onClick={() => setMapStyle(styleKey)}
-                className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold capitalize transition-colors flex items-center gap-1 ${
-                  mapStyle === styleKey
-                    ? 'bg-amber-500 text-slate-950 shadow'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {styleKey === 'satellite' && <span>🛰️</span>}
-                {styleKey === 'street' && <span>🛣️</span>}
-                {styleKey === 'dark' && <span>🌙</span>}
-                <span>{styleKey}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Road Defect Hotspots Toggle */}
-          <button
-            onClick={() => {
-              setShowTrafficLayer(!showTrafficLayer);
-              showToast?.(
-                showTrafficLayer ? 'Road defect hotspots hidden' : 'Road defect hotspots active',
-                'info'
-              );
-            }}
-            className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold border transition-all flex items-center gap-1 backdrop-blur-xl shadow-xl flex-shrink-0 ${
-              showTrafficLayer
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                : 'bg-[#111827]/95 text-slate-400 border-slate-700/80'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">traffic</span>
-            <span>Hotspots</span>
-            {showTrafficLayer && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-          </button>
-
-          {/* GPS Simulation Toggle */}
-          <button
-            onClick={() => {
-              if (isSimulating) {
-                onToggleSimulation?.();
-                showToast?.('Drive simulation stopped', 'info');
-              } else {
-                onToggleSimulation?.();
-                showToast?.('🚗 Drive Route simulation active', 'success');
-              }
-            }}
-            className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1 transition-all border backdrop-blur-xl shadow-xl flex-shrink-0 ${
-              isSimulating
-                ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_12px_rgba(37,99,235,0.6)] animate-pulse'
-                : 'bg-[#111827]/95 text-slate-300 border-slate-700/80 hover:text-blue-400'
-            }`}
-          >
-            <span className="material-symbols-outlined text-xs">directions_car</span>
-            <span>{isSimulating ? 'Sim On' : 'Simulate'}</span>
-          </button>
-
-          {/* Live Device GPS Toggle */}
-          <button
-            onClick={() => {
-              if (isGpsTracking && !isSimulating) {
-                onStopGps?.();
-                showToast?.('GPS tracking paused', 'info');
-              } else {
-                onStartGps?.();
-                showToast?.('Live GPS tracking started', 'success');
-              }
-            }}
-            className={`p-1.5 rounded-xl text-xs font-bold transition-all border backdrop-blur-xl shadow-xl flex-shrink-0 ${
-              isGpsTracking && !isSimulating
-                ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                : 'bg-[#111827]/95 text-slate-400 border-slate-700/80 hover:text-slate-200'
-            }`}
-            title="Toggle Live Device GPS"
-          >
-            <span className="material-symbols-outlined text-sm">gps_fixed</span>
-          </button>
-
-          {/* Recenter Button */}
-          <button
-            onClick={handleRecenter}
-            className={`p-1.5 rounded-xl border backdrop-blur-xl shadow-xl flex items-center justify-center transition-all flex-shrink-0 ${
-              followVehicle
-                ? 'bg-[#111827]/95 border-blue-500 text-blue-400'
-                : 'bg-[#111827]/95 border-slate-700/80 text-slate-300 hover:text-amber-400'
-            }`}
-            title="Recenter Map"
-          >
-            <span className="material-symbols-outlined text-sm">my_location</span>
-          </button>
+        {/* 7-Day Active Map Indicator */}
+        <div className="pointer-events-auto bg-amber-500/15 border border-amber-500/30 rounded-2xl px-2.5 py-1.5 md:py-2 flex items-center gap-1.5 text-amber-300 text-[10px] md:text-xs font-mono font-bold shadow-2xl flex-shrink-0 backdrop-blur-xl">
+          <span className="material-symbols-outlined text-xs md:text-sm text-amber-400">history</span>
+          <span className="hidden xs:inline">7-Day Dots</span>
+          <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-400 font-extrabold">{activeHazardsList.length}</span>
         </div>
       </div>
 
-      {/* Floating Speedometer & Live Telemetry Badge (Compact on Mobile) */}
+      {/* Floating Speedometer & Live Telemetry Badge */}
       {currentGps && (
-        <div className="absolute top-[84px] md:top-20 left-2 md:left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-700/80 rounded-xl p-1.5 md:p-3 shadow-2xl flex items-center gap-2 max-w-[220px] md:max-w-sm animate-in fade-in">
-          <div className="w-8 h-8 md:w-11 md:h-11 rounded-lg bg-blue-500/15 border border-blue-500/40 flex flex-col items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] flex-shrink-0">
-            <span className="text-[11px] md:text-sm font-extrabold font-heading leading-none">
+        <div className="absolute top-14 md:top-20 left-2 md:left-4 z-[350] pointer-events-auto bg-[#111827]/90 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-2 md:p-2.5 shadow-2xl flex items-center gap-2 max-w-[190px] xs:max-w-[220px] md:max-w-sm animate-in fade-in">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-blue-500/15 border border-blue-500/40 flex flex-col items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.2)] flex-shrink-0">
+            <span className="text-xs md:text-sm font-extrabold font-heading leading-none">
               {currentGps.speed || 0}
             </span>
             <span className="text-[6px] md:text-[7px] font-mono uppercase text-slate-400">km/h</span>
@@ -665,6 +568,138 @@ export default function MapView({
           </div>
         </div>
       )}
+
+      {/* Right Floating Quick Action Buttons (Google Maps style FAB stack - No scrolling required!) */}
+      <div className="absolute right-2 md:right-4 top-14 md:top-20 z-[400] flex flex-col items-end gap-2 pointer-events-auto">
+        {/* Recenter Button */}
+        <button
+          onClick={handleRecenter}
+          className={`w-10 h-10 rounded-2xl border backdrop-blur-2xl shadow-2xl flex items-center justify-center transition-all active:scale-90 ${
+            followVehicle
+              ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.6)]'
+              : 'bg-[#111827]/95 border-slate-700/90 text-slate-200 hover:text-amber-400'
+          }`}
+          title="Recenter Map on Vehicle"
+        >
+          <span className="material-symbols-outlined text-lg">my_location</span>
+        </button>
+
+        {/* Live Device GPS Toggle */}
+        <button
+          onClick={() => {
+            if (isGpsTracking && !isSimulating) {
+              onStopGps?.();
+              showToast?.('GPS tracking paused', 'info');
+            } else {
+              onStartGps?.();
+              showToast?.('Live GPS tracking started', 'success');
+            }
+          }}
+          className={`w-10 h-10 rounded-2xl border backdrop-blur-2xl shadow-2xl flex items-center justify-center transition-all active:scale-90 relative ${
+            isGpsTracking && !isSimulating
+              ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+              : 'bg-[#111827]/95 border-slate-700/90 text-slate-400 hover:text-slate-200'
+          }`}
+          title="Toggle Real-Time GPS Tracking"
+        >
+          <span className="material-symbols-outlined text-lg">gps_fixed</span>
+          {isGpsTracking && !isSimulating && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-950 animate-ping" />
+          )}
+        </button>
+
+        {/* Layer Switcher (Satellite / Street / Dark) */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLayerMenu(!showLayerMenu)}
+            className={`w-10 h-10 rounded-2xl border backdrop-blur-2xl shadow-2xl flex items-center justify-center transition-all active:scale-90 ${
+              showLayerMenu
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                : 'bg-[#111827]/95 border-slate-700/90 text-slate-200 hover:text-amber-400'
+            }`}
+            title="Switch Map Layers (Satellite, Street, Dark)"
+          >
+            <span className="material-symbols-outlined text-lg">layers</span>
+          </button>
+
+          {/* Layer Selection Dropdown Menu */}
+          {showLayerMenu && (
+            <div
+              className="absolute right-12 top-0 bg-[#111827]/98 backdrop-blur-2xl border border-slate-700 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 z-50 min-w-[130px] animate-in fade-in slide-in-from-right-2"
+              onMouseLeave={() => setShowLayerMenu(false)}
+            >
+              <div className="px-2 py-1 text-[9px] font-mono text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                Map View
+              </div>
+              {Object.keys(TILE_LAYERS).map((styleKey) => (
+                <button
+                  key={styleKey}
+                  onClick={() => {
+                    setMapStyle(styleKey);
+                    setShowLayerMenu(false);
+                    showToast?.(`Switched to ${styleKey} view`, 'info');
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold capitalize transition-colors flex items-center gap-2 ${
+                    mapStyle === styleKey
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  }`}
+                >
+                  <span>{styleKey === 'satellite' ? '🛰️' : styleKey === 'street' ? '🛣️' : '🌙'}</span>
+                  <span>{styleKey}</span>
+                  {mapStyle === styleKey && <span className="material-symbols-outlined text-xs ml-auto">check</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Hotspots Toggle */}
+        <button
+          onClick={() => {
+            setShowTrafficLayer(!showTrafficLayer);
+            showToast?.(
+              showTrafficLayer ? 'Road defect hotspots hidden' : 'Road defect hotspots active',
+              'info'
+            );
+          }}
+          className={`w-10 h-10 rounded-2xl border backdrop-blur-2xl shadow-2xl flex items-center justify-center transition-all active:scale-90 relative ${
+            showTrafficLayer
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+              : 'bg-[#111827]/95 border-slate-700/90 text-slate-500 hover:text-slate-300'
+          }`}
+          title="Toggle Pothole Defect Hotspots"
+        >
+          <span className="material-symbols-outlined text-lg">traffic</span>
+          {showTrafficLayer && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-950 animate-pulse" />
+          )}
+        </button>
+
+        {/* GPS Drive Route Simulation Toggle */}
+        <button
+          onClick={() => {
+            if (isSimulating) {
+              onToggleSimulation?.();
+              showToast?.('Drive simulation stopped', 'info');
+            } else {
+              onToggleSimulation?.();
+              showToast?.('🚗 Live road drive route simulation active', 'success');
+            }
+          }}
+          className={`w-10 h-10 rounded-2xl border backdrop-blur-2xl shadow-2xl flex items-center justify-center transition-all active:scale-90 relative ${
+            isSimulating
+              ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.6)] animate-pulse'
+              : 'bg-[#111827]/95 border-slate-700/90 text-slate-400 hover:text-blue-400'
+          }`}
+          title={isSimulating ? 'Stop Drive Simulation' : 'Start Drive Simulation'}
+        >
+          <span className="material-symbols-outlined text-lg">directions_car</span>
+          {isSimulating && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-cyan-400 border border-slate-950 animate-ping" />
+          )}
+        </button>
+      </div>
 
       {/* Map Viewport Container - Covers 100% Full Viewport Area */}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-10" />
