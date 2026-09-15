@@ -5,11 +5,6 @@ web/node_modules/
 env/
 venv/
 
-# Production build outputs
-dist/
-web/dist/
-build/
-
 # Dataset archives & unpacked images
 pothole.v17i.yolov8/
 pothole_dataset.zip
