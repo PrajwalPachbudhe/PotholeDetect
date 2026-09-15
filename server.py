@@ -604,22 +604,28 @@ def manage_history():
 
         if user_id:
             cursor.execute("""
-                SELECT * FROM history 
-                WHERE user_id = ? AND datetime(created_at) >= datetime('now', '-7 days')
-                ORDER BY created_at DESC
+                SELECT h.*, u.name as user_name 
+                FROM history h
+                LEFT JOIN users u ON h.user_id = u.id
+                WHERE h.user_id = ? AND datetime(h.created_at) >= datetime('now', '-7 days')
+                ORDER BY h.created_at DESC
             """, (user_id,))
         elif user_email:
             cursor.execute("""
-                SELECT * FROM history 
-                WHERE user_email = ? AND datetime(created_at) >= datetime('now', '-7 days')
-                ORDER BY created_at DESC
-            """, (user_email,))
+                SELECT h.*, u.name as user_name 
+                FROM history h
+                LEFT JOIN users u ON h.user_id = u.id
+                WHERE (h.user_email = ? OR u.email = ?) AND datetime(h.created_at) >= datetime('now', '-7 days')
+                ORDER BY h.created_at DESC
+            """, (user_email, user_email))
         else:
             cursor.execute("""
-                SELECT * FROM history 
-                WHERE datetime(created_at) >= datetime('now', '-7 days')
-                ORDER BY created_at DESC
-                LIMIT 100
+                SELECT h.*, u.name as user_name 
+                FROM history h
+                LEFT JOIN users u ON h.user_id = u.id
+                WHERE datetime(h.created_at) >= datetime('now', '-7 days')
+                ORDER BY h.created_at DESC
+                LIMIT 200
             """)
 
         rows = cursor.fetchall()
@@ -629,6 +635,7 @@ def manage_history():
                 "id": r["id"],
                 "userId": r["user_id"],
                 "userEmail": r["user_email"],
+                "userName": r["user_name"] or "Inspector",
                 "title": r["title"],
                 "total_detections": r["total_detections"],
                 "detections": json.loads(r["detections_json"]) if r["detections_json"] else [],
